@@ -25,6 +25,6 @@ const adminRegister = new Schema(
   { timestamps: true }
 );
 
-const adminRegisterModel = mongoose.model("Admin Register", adminRegister);
+const AdminRegister = mongoose.model("Admin Register", adminRegister);
 
-export default adminRegisterModel;
+export default AdminRegister;
