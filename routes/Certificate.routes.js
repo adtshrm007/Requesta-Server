@@ -1,5 +1,5 @@
 import express from "express"
-import handleCertificates from "../controllers/Certificate.controller"
+import handleCertificates from "../controllers/Certificate.controller.js"
 
 const router=express.Router();
 

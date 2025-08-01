@@ -1,5 +1,5 @@
 import express from "express"
-import handleLeaves from "../controllers/Leave.controller"
+import handleLeaves from "../controllers/Leave.controller.js"
 
 const router=express.Router();
 

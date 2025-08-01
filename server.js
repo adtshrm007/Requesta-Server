@@ -1,17 +1,29 @@
-require('dotenv').config();
+import dotenv from "dotenv";
+dotenv.config();
 
-const express = require('express')
-const app = express()
-const port=process.env.PORT||5000
+import express from "express";
+import connectDB from "./config/connectDB.js"; // .js extension required
+import adminRoute from "./routes/Admin.routes.js";
+import studentRoute from "./routes/Student.routes.js";
+import certificateRoute from "./routes/Certificate.routes.js";
+import leaveRoute from "./routes/Leave.routes.js";
 
-const connectDB = require('./config/connectDB');
+const app = express();
+const port = process.env.PORT || 5000;
 
-connectDB(); // Connect to MongoDB
+app.use(express.json());
+
+app.use("/api/adminregister", adminRoute);
+app.use("/api/studentregister", studentRoute);
+app.use("/api/certificate", certificateRoute);
+app.use("/api/leaves", leaveRoute);
 
 app.get('/', (req, res) => {
-  res.send('Hello')
-})
+  res.send('Hello');
+});
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+connectDB().then(() => {
+  app.listen(port, () => {
+    console.log(`✅ Server running at http://localhost:${port}`);
+  });
+});

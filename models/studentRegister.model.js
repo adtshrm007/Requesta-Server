@@ -24,8 +24,6 @@ const studentRegisterSchema = new Schema({
   year: {
     type: Number, // or use enum if it's fixed
     required: true,
-    min: 1,
-    max: 4
   }
 }, { timestamps: true }); // Adds createdAt and updatedAt fields
 

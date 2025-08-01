@@ -1,21 +1,28 @@
-import Student from "../models/studentRegister.model"
+// Student.controller.js
+import Student from "../models/studentRegister.model.js";
 
-
-const registerStudent=async (req,res)=>{
-try {
-    const { registrationNumber, name, mobile,batch_year } = req.body;
+export const registerStudent = async (req, res) => {
+  try {
+    const { registrationNumber, name, mobileNumber, branch, year } = req.body;
 
     const existing = await Student.findOne({ registrationNumber });
-    if (existing) return res.status(400).json({ message: "Already registered" });
+    if (existing)
+      return res.status(400).json({ message: "Already registered" });
 
-    const newStudent = new Student({ registrationNumber, name, mobile,batch_year });
+    const newStudent = new Student({
+      registrationNumber,
+      name,
+      mobileNumber,
+      branch,
+      year,
+    });
     await newStudent.save();
 
     res.status(201).json({ message: "Student registered", data: newStudent });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}
+};
 
 export const getAllStudents = async (req, res) => {
   try {
@@ -25,6 +32,3 @@ export const getAllStudents = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
-export default registerStudent
-
