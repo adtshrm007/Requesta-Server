@@ -2,7 +2,7 @@ import mongoose, { Schema } from "mongoose";
 
 const CertificateModel = new Schema(
   {
-    StudentName: {
+    student: {
       type: Schema.Types.ObjectId,
       ref: "Student",
       required: true,

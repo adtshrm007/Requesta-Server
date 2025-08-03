@@ -1,23 +1,36 @@
+// controller.js
 import LeaveModel from "../models/Leave.model.js";
 
-const handleLeaves = async (req, res) => {
+export const handleLeaves = async (req, res) => {
   try {
-    const { StudentName, Reason, status, SupportingDocument } = req.body;
+    const { student, Reason, status, SupportingDocuments } = req.body;
 
     const newLeaveApplication = new LeaveModel({
-      StudentName,
+      student,
       Reason,
       status,
-      SupportingDocument,
+      SupportingDocuments, // fixed field name
     });
+
     await newLeaveApplication.save();
 
-    res
-      .status(201)
-      .json({ message: "Leave Application Send", data: newLeaveApplication });
+    res.status(201).json({
+      message: "Leave Application Sent",
+      data: newLeaveApplication,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-export default handleLeaves;
+export const getAllLeaves = async (req, res) => {
+  try {
+    const leavemodels = await LeaveModel.find().populate(
+      "student",
+      "name registrationNumber" // fixed spelling
+    );
+    res.status(200).json(leavemodels);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

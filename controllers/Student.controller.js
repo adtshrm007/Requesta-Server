@@ -25,10 +25,15 @@ export const registerStudent = async (req, res) => {
 };
 
 export const getAllStudents = async (req, res) => {
+ const { registrationNumber } = req.query;
   try {
-    const students = await Student.find();
-    res.json(students);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const student = await Student.findOne({ registrationNumber }); // Assuming MongoDB
+    if (student) {
+      res.json(student);
+    } else {
+      res.status(404).json({ message: "Student not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
   }
 };

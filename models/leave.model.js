@@ -1,10 +1,10 @@
 import mongoose,{ Schema } from "mongoose";
 
 const LeaveModelSchema = new Schema({
-    StudentName:{
+    student:{
         type:Schema.Types.ObjectId,
-        ref:"Student",
-        required:true
+        required:true,
+
     },
     Reason:{
         type:String,
@@ -20,6 +20,8 @@ const LeaveModelSchema = new Schema({
         required:false
     }
 }, { timestamps: true });
+
+
 
 const LeaveModel=mongoose.model("Leave",LeaveModelSchema);
 export default LeaveModel
