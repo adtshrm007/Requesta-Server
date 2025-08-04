@@ -9,7 +9,7 @@ export const handleLeaves = async (req, res) => {
       student,
       Reason,
       status,
-      SupportingDocuments, // fixed field name
+      SupportingDocuments,
     });
 
     await newLeaveApplication.save();

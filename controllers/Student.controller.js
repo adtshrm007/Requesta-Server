@@ -4,10 +4,18 @@ import Student from "../models/studentRegister.model.js";
 export const registerStudent = async (req, res) => {
   try {
     const { registrationNumber, name, mobileNumber, branch, year } = req.body;
+    const existing = await Student.findOne({
+      $or: [
+        { registrationNumber: req.body.registrationNumber },
+        { mobileNumber: req.body.mobileNumber },
+      ],
+    });
 
-    const existing = await Student.findOne({ registrationNumber });
-    if (existing)
-      return res.status(400).json({ message: "Already registered" });
+    if (existing) {
+      return res.status(400).json({
+        message: "Student already registered with this reg. no or mobile no",
+      });
+    }
 
     const newStudent = new Student({
       registrationNumber,
@@ -25,11 +33,19 @@ export const registerStudent = async (req, res) => {
 };
 
 export const getAllStudents = async (req, res) => {
- const { registrationNumber } = req.query;
+  const { registrationNumber } = req.query;
   try {
     const student = await Student.findOne({ registrationNumber }); // Assuming MongoDB
     if (student) {
-      res.json(student);
+      const accessToken = student.generateAccessToken();
+      const refreshToken = student.generateRefreshToken();
+      student.refreshToken = refreshToken;
+      await student.save();
+      res.json({
+        message: "Student Found",
+        data: student,
+        accessToken,
+      });
     } else {
       res.status(404).json({ message: "Student not found" });
     }

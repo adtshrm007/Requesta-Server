@@ -19,6 +19,7 @@ app.use("/api/studentregister", studentRoute);
 app.use("/api/certificate", certificateRoute);
 app.use("/api/leaves", leaveRoute);
 
+
 app.get('/', (req, res) => {
   res.send('Hello');
 });
