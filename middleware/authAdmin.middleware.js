@@ -1,0 +1,36 @@
+import jwt from "jsonwebtoken";
+import AdminRegister from "../models/adminRegister.model";
+
+export const verifyAccessToken = async (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Access token missing" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+
+    const admin = await AdminRegister.findOne({
+      registrationNumber: decoded.registrationNumber,
+    });
+
+    if (!admin) {
+      return res.status(403).json({ message: "Admin not found" });
+    }
+
+    req.user = {
+      id: admin._id,
+      adminID: admin.adminID,
+      name: admin.name,
+      mobileNumber: admin.mobileNumber,
+      department: admin.department,
+      refreshToken: admin.refreshToken,
+    };
+
+    next();
+  } catch (err) {
+    return res.status(403).json({ message: "Invalid or expired token" });
+  }
+};

@@ -35,7 +35,7 @@ export const registerStudent = async (req, res) => {
 export const getAllStudents = async (req, res) => {
   const { registrationNumber } = req.query;
   try {
-    const student = await Student.findOne({ registrationNumber }); // Assuming MongoDB
+    const student = await Student.findOne({ registrationNumber });
     if (student) {
       const accessToken = student.generateAccessToken();
       const refreshToken = student.generateRefreshToken();
@@ -51,5 +51,28 @@ export const getAllStudents = async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const updateStudent = async (req, res) => {
+  try {
+    const { name, mobileNumber, branch, year } = req.body;
+
+    const updatedStudent = await Student.findOneAndUpdate(
+      { registrationNumber: req.user.registrationNumber }, // or use _id: req.user.id
+      { name, mobileNumber, branch, year },
+      { new: true }
+    );
+
+    if (!updatedStudent) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      data: updatedStudent,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };

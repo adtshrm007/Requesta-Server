@@ -1,37 +1,71 @@
-import AdminRegister from "../models/adminRegister.model.js";
-import Student from "../models/studentRegister.model.js"; // <-- This import was missing
+import AdminRegister from "../models/adminRegister.model";
 
-// Register a new admin
 export const registerAdmin = async (req, res) => {
   try {
     const { adminID, name, mobileNumber, department } = req.body;
-
-    const existing = await AdminRegister.findOne({ adminID }); // FIX: Was incorrectly checking Student
-    if (existing)
-      return res.status(400).json({ message: "Admin already registered" });
-
-    const newAdmin = new AdminRegister({ adminID, name, mobileNumber, department });
-    await newAdmin.save();
-
-    res.status(201).json({ message: "Admin registered", data: newAdmin });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Get all registered students
-export const getAdmin = async (req, res) => {
-  const {adminID}=req.query;
-  try {
-    const admin = await AdminRegister.findOne({adminID});
-    if (admin) {
-      res.json(admin);
-    } else {
-      res.status(404).json({ message: "Admin not found" });
+    const existing = await AdminRegister.findOne({
+      $or: [
+        { adminID: req.body.adminID },
+        { mobileNumber: req.body.mobileNumber },
+      ],
+    });
+    if (existing) {
+      return res.status(400).json({
+        message: "Admin already registered with this ID or mobile number",
+      });
     }
+    const newAdmin = new AdminRegister({
+      adminID,
+      name,
+      mobileNumber,
+      department,
+    });
+    await newAdmin.save();
+    return res
+      .status(200)
+      .json({ message: "Admin registered succesfully", data: newAdmin });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.staus(500).json({ error: err.message });
   }
 };
 
+export const getAdminById = async (req, res) => {
+  try {
+    const { adminID } = req.query;
+    const admin = await AdminRegister.findOne({ adminID });
+    if (admin) {
+      const accesToken = admin.generateAccessToken();
+      const refreshToken = admin.generateRefreshToken();
+      admin.refreshToken = refreshToken;
+      await admin.save();
+      return res.status(200).json({ message: "Admin Found", data: accesToken });
+    }
+    return res.status(404).json({message:"Admin not Found.Please check the ID"})
 
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+export const updateAdmin=async(req,res)=>{
+  try{
+    const {name,mobileNumber,department}=req.body;
+    const updatedAdmin=await AdminRegister.findOneAndUpdate(
+      {
+        adminID:req.body.adminID
+      },
+      {name,mobileNumber,department},
+      {new:true}
+
+    )
+    if(!updatedAdmin){
+      return res.status(404).json({message:"Admin not found"})
+
+    }
+    return res.status(200).json({message:"Admin updated successfully",data:updateAdmin})
+    
+  }
+  catch(err){
+    return res.status(500).json({ error: err.message });
+  }
+}
