@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import AdminRegister from "../models/adminRegister.model";
+import AdminRegister from "../models/adminRegister.model.js";
 
 export const verifyAccessToken = async (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -13,7 +13,7 @@ export const verifyAccessToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
     const admin = await AdminRegister.findOne({
-      registrationNumber: decoded.registrationNumber,
+      adminID: decoded.adminID,
     });
 
     if (!admin) {

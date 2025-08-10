@@ -1,4 +1,4 @@
-import AdminRegister from "../models/adminRegister.model";
+import AdminRegister from "../models/adminRegister.model.js";
 
 export const registerAdmin = async (req, res) => {
   try {
@@ -25,7 +25,7 @@ export const registerAdmin = async (req, res) => {
       .status(200)
       .json({ message: "Admin registered succesfully", data: newAdmin });
   } catch (err) {
-    return res.staus(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 
@@ -34,11 +34,11 @@ export const getAdminById = async (req, res) => {
     const { adminID } = req.query;
     const admin = await AdminRegister.findOne({ adminID });
     if (admin) {
-      const accesToken = admin.generateAccessToken();
+      const accessToken = admin.generateAccessToken();
       const refreshToken = admin.generateRefreshToken();
       admin.refreshToken = refreshToken;
       await admin.save();
-      return res.status(200).json({ message: "Admin Found", data: accesToken });
+      return res.status(200).json({ message: "Admin Found", data: admin,accessToken });
     }
     return res.status(404).json({message:"Admin not Found.Please check the ID"})
 
@@ -62,7 +62,7 @@ export const updateAdmin=async(req,res)=>{
       return res.status(404).json({message:"Admin not found"})
 
     }
-    return res.status(200).json({message:"Admin updated successfully",data:updateAdmin})
+    return res.status(200).json({message:"Admin updated successfully",data:updatedAdmin})
     
   }
   catch(err){
