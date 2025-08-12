@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import AdminRegister from "../models/adminRegister.model.js";
 
-export const verifyAccessToken = async (req, res, next) => {
+export const verifyAccessToken1 = async (req, res, next) => {
   const authHeader = req.headers["authorization"];
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Access token missing" });

@@ -5,8 +5,8 @@ import express from "express";
 import connectDB from "./config/connectDB.js"; // .js extension required
 import adminRoute from "./routes/Admin.routes.js";
 import studentRoute from "./routes/Student.routes.js";
-import certificateRoute from "./routes/Certificate.routes.js";
-import leaveRoute from "./routes/Leave.routes.js";
+
+
 import cors from "cors"
 
 const app = express();
@@ -16,8 +16,8 @@ app.use(express.json());
 app.use(cors());
 app.use("/api/adminregister", adminRoute);
 app.use("/api/studentregister", studentRoute);
-app.use("/api/certificate", certificateRoute);
-app.use("/api/leaves", leaveRoute);
+
+
 
 
 app.get('/', (req, res) => {

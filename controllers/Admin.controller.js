@@ -1,4 +1,5 @@
 import AdminRegister from "../models/adminRegister.model.js";
+import Student from "../models/studentRegister.model.js";
 
 export const registerAdmin = async (req, res) => {
   try {
@@ -69,3 +70,16 @@ export const updateAdmin=async(req,res)=>{
     return res.status(500).json({ error: err.message });
   }
 }
+
+export const getAllStudentsDataForAdmin = async (req, res) => {
+  try {
+    const allStudents = await Student.find()
+      .select("registrationNumber name mobileNumber branch year")
+      .sort({ name: 1 });
+
+    return res.status(200).json(allStudents);
+  } catch (error) {
+    console.error("Error occurred while fetching students data:", error);
+    return res.status(500).json({ message: "An error occurred while fetching the data" });
+  }
+};
