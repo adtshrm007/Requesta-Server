@@ -5,7 +5,7 @@ const LeaveModelSchema = new Schema(
     studentId: { type: Schema.Types.ObjectId, ref: "Student", required: true },
     studentName: { type: String, required: true },
     studentRegNumber: { type: String, required: true },
-    subject:{type:String,required:true},
+    subject: { type: String, required: true },
     Reason: {
       type: String,
       required: true,
