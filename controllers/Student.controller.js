@@ -1,6 +1,6 @@
 // Student.controller.js
 import Student from "../models/studentRegister.model.js";
-
+import LeaveModel from "../models/Leave.model.js";
 export const registerStudent = async (req, res) => {
   try {
     const { registrationNumber, name, mobileNumber, branch, year } = req.body;
@@ -76,6 +76,18 @@ export const updateStudent = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+export const getLeaves=async(req,res)=>{
+  try {
+    const leaves = await LeaveModel.find({ studentId: req.user.id })
+      .populate("studentId")
+      .sort({ createdAt: -1 });
 
+    res.status(200).json(leaves);
+  } catch (err) {
+    console.error("Error fetching leaves:", err);
+    res.status(500).json({ error: "Server error while fetching leaves" });
+  }
+
+}
 
 

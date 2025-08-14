@@ -1,22 +1,24 @@
 // controller.js
 import LeaveModel from "../models/Leave.model.js";
+import Student from "../models/studentRegister.model.js";
 
 export const handleLeaves = async (req, res) => {
   try {
-    const { student, Reason, status, SupportingDocuments } = req.body;
+    const student = await Student.findById(req.user.id);
 
-    const newLeaveApplication = new LeaveModel({
-      student,
-      Reason,
-      status,
-      SupportingDocuments,
+    const newLeave = new LeaveModel({
+      studentId: student._id,
+      studentName: student.name,
+      studentRegNumber: student.registrationNumber,
+      subject:req.body.subject,
+      Reason: req.body.Reason,
     });
 
-    await newLeaveApplication.save();
+    await newLeave.save();
 
     res.status(201).json({
       message: "Leave Application Sent",
-      data: newLeaveApplication,
+      data: newLeave,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -25,11 +27,8 @@ export const handleLeaves = async (req, res) => {
 
 export const getAllLeaves = async (req, res) => {
   try {
-    const leavemodels = await LeaveModel.find().populate(
-      "student",
-      "name registrationNumber" // fixed spelling
-    );
-    res.status(200).json(leavemodels);
+    const leaves = await LeaveModel.find().populate("studentId");
+    res.json(leaves);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
