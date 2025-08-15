@@ -1,9 +1,10 @@
 import express from "express"
 
 const router=express.Router();
-import { handleLeaves,getAllLeaves } from "../controllers/Leave.controller.js";
+import { handleLeaves,getAllLeaves,UpdateLeaves } from "../controllers/Leave.controller.js";
 import { verifyAccessToken } from "../middleware/authStudent.middleware.js";
+import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 router.post("/submitLeaves",verifyAccessToken,handleLeaves);
-router.get("/showLeaves",getAllLeaves)
-
+router.get("/showLeaves",verifyAccessToken1,getAllLeaves)
+router.put("/updateLeaves",verifyAccessToken1,UpdateLeaves);
 export default router;

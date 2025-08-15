@@ -1,4 +1,5 @@
 import AdminRegister from "../models/adminRegister.model.js";
+import LeaveModel from "../models/Leave.model.js";
 import Student from "../models/studentRegister.model.js";
 
 export const registerAdmin = async (req, res) => {
@@ -83,3 +84,19 @@ export const getAllStudentsDataForAdmin = async (req, res) => {
     return res.status(500).json({ message: "An error occurred while fetching the data" });
   }
 };
+export const getRequetsOfAStudentForAdmin=async(req,res)=>{
+  try{
+    const { studentId } = req.query;
+    const leaves=await LeaveModel.find({studentId})
+    .populate("studentId")
+    .sort({ createdAt: -1 });
+    if(!leaves || leaves.length===0){
+      return res.status(404).json({message:"No leaves found for this student"})
+    }
+    return res.status(200).json(leaves);
+  }
+  catch(err){
+    console.error("Error fetching leaves:", err);
+    res.status(500).json({ error: "Server error while fetching leaves" });
+  }
+}

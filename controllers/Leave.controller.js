@@ -10,7 +10,7 @@ export const handleLeaves = async (req, res) => {
       studentId: student._id,
       studentName: student.name,
       studentRegNumber: student.registrationNumber,
-      subject:req.body.subject,
+      subject: req.body.subject,
       Reason: req.body.Reason,
     });
 
@@ -31,5 +31,34 @@ export const getAllLeaves = async (req, res) => {
     res.json(leaves);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+export const UpdateLeaves = async (req, res) => {
+  try {
+    const { leaveId, status } = req.body;
+    const validStatus = ["approved", "rejected", "pending"];
+
+    if (!leaveId)
+      return res.status(400).json({ message: "Leave ID is required" });
+    if (!validStatus.includes(status))
+      return res.status(400).json({ message: "Invalid status value" });
+
+    const updateStatus = await LeaveModel.findByIdAndUpdate(
+      leaveId,
+      { status },
+      { new: true }
+    ).populate("studentId");
+
+    if (!updateStatus)
+      return res.status(404).json({ message: "Leave not found" });
+
+    return res
+      .status(200)
+      .json({ message: "Status updated successfully", data: updateStatus });
+  } catch (err) {
+    console.error("Error updating leaves:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: err.message });
   }
 };
