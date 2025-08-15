@@ -1,6 +1,6 @@
 import express from "express"
 
-import {registerStudent,getAllStudents,updateStudent,getLeaves} from "../controllers/Student.controller.js";
+import {registerStudent,getAllStudents,updateStudent,getLeaves,getCertificates} from "../controllers/Student.controller.js";
 import { verifyAccessToken } from "../middleware/authStudent.middleware.js";
 
 
@@ -15,6 +15,7 @@ router.get("/dashboard",verifyAccessToken,(req,res)=>{
 })
 router.put("/update",verifyAccessToken,updateStudent)
 router.get("/getLeaves",verifyAccessToken,getLeaves)
+router.get("/getCertificates",verifyAccessToken,getCertificates);
 
 
 export default router;

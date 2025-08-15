@@ -7,22 +7,22 @@ const CertificateModel = new Schema(
       ref: "Student",
       required: true,
     },
+    purpose: {
+      type: String,
+      required: true,
+    },
     CertificateType: {
       type: String,
-      enum: ["Bonafide", "Others"],
       required: true,
     },
     status: {
       type: String,
       enum: ["pending", "accepted", "rejected"],
-    },
-    RequiredDocument: {
-        type:String,
-        required:true
+      default: "pending",
     },
   },
   { timestamps: true }
 );
 
-const Certificate=mongoose.model("Certificate",CertificateModel)
-export default Certificate
+const Certificate = mongoose.model("Certificate", CertificateModel);
+export default Certificate;
