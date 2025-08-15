@@ -27,7 +27,10 @@ export const handleLeaves = async (req, res) => {
 
 export const getAllLeaves = async (req, res) => {
   try {
-    const leaves = await LeaveModel.find().populate("studentId");
+    const dept = req.user.department;
+    const leaves = await LeaveModel.find()
+      .populate({ path: "studentId", match: { branch: dept } })
+      .then((leaves) => leaves.filter((leave) => leave.studentId !== null));
     res.json(leaves);
   } catch (err) {
     res.status(500).json({ error: err.message });

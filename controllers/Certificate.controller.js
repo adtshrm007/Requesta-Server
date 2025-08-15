@@ -23,7 +23,12 @@ export const handleCertificateRequests = async (req, res) => {
 
 export const getAllCertificates = async (req, res) => {
   try {
-    const certificate = await Certificate.find().populate("student");
+    const dept = req.user.department;
+    const certificate = await Certificate.find()
+      .populate({ path: "student", match: { branch: dept } })
+      .then((certificate) =>
+        certificate.filter((cert) => cert.student !== null)
+      );
     res.json(certificate);
   } catch (err) {
     res.status(500).json({ error: err.message });

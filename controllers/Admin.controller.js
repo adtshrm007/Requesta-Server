@@ -74,7 +74,9 @@ export const updateAdmin=async(req,res)=>{
 
 export const getAllStudentsDataForAdmin = async (req, res) => {
   try {
-    const allStudents = await Student.find()
+    const dept= req.user.department;
+
+    const allStudents = await Student.find({branch: dept})
       .select("registrationNumber name mobileNumber branch year")
       .sort({ name: 1 });
 
