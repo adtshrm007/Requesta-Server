@@ -1,7 +1,7 @@
 import AdminRegister from "../models/adminRegister.model.js";
 import LeaveModel from "../models/Leave.model.js";
 import Student from "../models/studentRegister.model.js";
-
+import Certificate from "../models/Certificate.model.js";
 export const registerAdmin = async (req, res) => {
   try {
     const { adminID, name, mobileNumber, department } = req.body;
@@ -94,6 +94,22 @@ export const getRequetsOfAStudentForAdmin=async(req,res)=>{
     .sort({ createdAt: -1 });
     if(!leaves || leaves.length===0){
       return res.status(404).json({message:"No leaves found for this student"})
+    }
+    return res.status(200).json(leaves);
+  }
+  catch(err){
+    console.error("Error fetching leaves:", err);
+    res.status(500).json({ error: "Server error while fetching leaves" });
+  }
+}
+export const getCertificateRequetsOfAStudentForAdmin=async(req,res)=>{
+  try{
+    const { student } = req.query;
+    const leaves=await Certificate.find({student})
+    .populate("student")
+    .sort({ createdAt: -1 });
+    if(!leaves || leaves.length===0){
+      return res.status(404).json({message:"No Certificates found for this student"})
     }
     return res.status(200).json(leaves);
   }
