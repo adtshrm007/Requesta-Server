@@ -4,7 +4,7 @@ import LeaveModel from "../models/Leave.model.js";
 import Certificate from "../models/Certificate.model.js";
 export const registerStudent = async (req, res) => {
   try {
-    const { registrationNumber, name, mobileNumber, branch, year } = req.body;
+    const { registrationNumber, name, mobileNumber,password, branch, year } = req.body;
     const existing = await Student.findOne({
       $or: [
         { registrationNumber: req.body.registrationNumber },
@@ -22,6 +22,7 @@ export const registerStudent = async (req, res) => {
       registrationNumber,
       name,
       mobileNumber,
+      password,
       branch,
       year,
     });
@@ -34,9 +35,16 @@ export const registerStudent = async (req, res) => {
 };
 
 export const getAllStudents = async (req, res) => {
-  const { registrationNumber } = req.query;
+  const { registrationNumber,password } = req.body;
   try {
-    const student = await Student.findOne({ registrationNumber });
+    const student = await Student.findOne({ registrationNumber});
+     if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    const isMatch = await student.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
     if (student) {
       const accessToken = student.generateAccessToken();
       const refreshToken = student.generateRefreshToken();
@@ -57,11 +65,11 @@ export const getAllStudents = async (req, res) => {
 
 export const updateStudent = async (req, res) => {
   try {
-    const { name, mobileNumber, branch, year } = req.body;
+    const { name, mobileNumber, password,branch, year } = req.body;
 
     const updatedStudent = await Student.findOneAndUpdate(
       { registrationNumber: req.user.registrationNumber }, // or use _id: req.user.id
-      { name, mobileNumber, branch, year },
+      { name, mobileNumber, password, branch, year },
       { new: true }
     );
 
