@@ -34,18 +34,17 @@ export const registerStudent = async (req, res) => {
   }
 };
 
-export const getAllStudents = async (req, res) => {
-  const { registrationNumber,password } = req.body;
+export const loginStudent = async (req, res) => {
+  const { registrationNumber,password} = req.body;
   try {
     const student = await Student.findOne({ registrationNumber});
      if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-    const isMatch = await student.comparePassword(password);
+    const isMatch = await student.isPasswordCorrect(password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    if (student) {
       const accessToken = student.generateAccessToken();
       const refreshToken = student.generateRefreshToken();
       student.refreshToken = refreshToken;
@@ -55,9 +54,6 @@ export const getAllStudents = async (req, res) => {
         data: student,
         accessToken,
       });
-    } else {
-      res.status(404).json({ message: "Student not found" });
-    }
   } catch (error) {
     res.status(500).json({ error: "Server error" });
   }

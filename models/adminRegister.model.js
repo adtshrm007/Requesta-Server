@@ -1,12 +1,17 @@
 import mongoose, { Schema } from "mongoose";
 import jwt from "jsonwebtoken";
-
+import bcrypt from "bcryptjs";
 const adminRegister = new Schema(
   {
     adminID: {
       type: String,
       required: true,
       unique: true,
+    },
+    password:{
+      type:String,
+      required:true
+
     },
     name: {
       type: String,
@@ -28,6 +33,17 @@ const adminRegister = new Schema(
   },
   { timestamps: true }
 );
+
+adminRegister.pre("save",async function(next){
+  if(!this.isModified("password")) return next();
+
+    this.password = await bcrypt.hash(this.password, 10)
+    next();
+
+})
+adminRegister.methods.isPasswordCorrect=async function(password){
+  return await bcrypt.compare(password, this.password)
+}
 
 adminRegister.methods.generateAccessToken = function () {
   return jwt.sign(

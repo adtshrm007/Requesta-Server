@@ -4,7 +4,7 @@ import Student from "../models/studentRegister.model.js";
 import Certificate from "../models/Certificate.model.js";
 export const registerAdmin = async (req, res) => {
   try {
-    const { adminID, name, mobileNumber, department } = req.body;
+    const { adminID, password,name, mobileNumber, department } = req.body;
     const existing = await AdminRegister.findOne({
       $or: [
         { adminID: req.body.adminID },
@@ -18,6 +18,7 @@ export const registerAdmin = async (req, res) => {
     }
     const newAdmin = new AdminRegister({
       adminID,
+      password,
       name,
       mobileNumber,
       department,
@@ -33,9 +34,13 @@ export const registerAdmin = async (req, res) => {
 
 export const getAdminById = async (req, res) => {
   try {
-    const { adminID } = req.query;
+    const { adminID,password } = req.body;
     const admin = await AdminRegister.findOne({ adminID });
     if (admin) {
+      const isMatch =await admin.isPasswordCorrect(password);
+      if(!isMatch){
+        return res.status(401).json({message:"Invalid Credentials"})
+      }
       const accessToken = admin.generateAccessToken();
       const refreshToken = admin.generateRefreshToken();
       admin.refreshToken = refreshToken;
