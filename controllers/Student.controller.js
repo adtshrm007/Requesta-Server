@@ -98,12 +98,13 @@ export const getCertificates = async (req, res) => {
     const certificates = await Certificate.find({ student: req.user.id })
       .populate("student")
       .sort({ createdAt: -1 });
-    res.status(200).json(certificates);
+    
     if (!certificates || certificates.length === 0) {
       return res
         .status(404)
         .json({ message: "No certificates found for this student" });
     }
+    res.status(200).json(certificates);
     
   } catch (err) {
     console.error("Error fetching certificates:", err);

@@ -1,15 +1,28 @@
 import Certificate from "../models/Certificate.model.js";
 import Student from "../models/studentRegister.model.js";
+import cloudinary from "../config/cloudinary.js"
+import fs from "fs"
 export const handleCertificateRequests = async (req, res) => {
   try {
     const student = await Student.findById(req.user.id);
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
+    let supportingDocumentUrl=null;
+    if(req.file){
+      const result=await cloudinary.uploader.upload(req.file.path,{
+        resource_type:"auto"
+      })
+      supportingDocumentUrl=result.secure_url;
+
+      fs.unlinkSync(req.file.path)
+
+    }
     const newCertificate = new Certificate({
       student: student._id,
       purpose: req.body.purpose,
       CertificateType: req.body.CertificateType,
+      supportingDocument:supportingDocumentUrl
     });
     await newCertificate.save();
     return res.status(201).json({

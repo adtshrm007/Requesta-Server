@@ -1,17 +1,33 @@
 // controller.js
 import LeaveModel from "../models/Leave.model.js";
 import Student from "../models/studentRegister.model.js";
-
+import cloudinary from "../config/cloudinary.js"
+import fs from "fs";
+import mime from "mime-types";
 export const handleLeaves = async (req, res) => {
   try {
     const student = await Student.findById(req.user.id);
+
+    let supportingDocumentUrl = null;
+
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "auto", // handles pdf, image, etc.
+      });
+
+      supportingDocumentUrl = result.secure_url;
+
+      // delete local file
+      fs.unlinkSync(req.file.path);
+    }
 
     const newLeave = new LeaveModel({
       studentId: student._id,
       studentName: student.name,
       studentRegNumber: student.registrationNumber,
       subject: req.body.subject,
-      Reason: req.body.Reason,
+      Reason: req.body.Reason, // make sure your frontend also sends lowercase "reason"
+      supportingDocument: supportingDocumentUrl,
     });
 
     await newLeave.save();
@@ -21,6 +37,7 @@ export const handleLeaves = async (req, res) => {
       data: newLeave,
     });
   } catch (err) {
+    console.error("Leave submission error:", err);
     res.status(500).json({ error: err.message });
   }
 };

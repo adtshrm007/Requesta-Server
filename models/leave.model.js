@@ -15,6 +15,10 @@ const LeaveModelSchema = new Schema(
       enum: ["pending", "accepted", "rejected"],
       default: "pending",
     },
+    supportingDocument:{
+      type:String,
+      required:false
+    }
   },
   { timestamps: true }
 );
