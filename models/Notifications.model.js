@@ -1,29 +1,18 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose,{ Schema } from "mongoose";
 
-const NotificationsModelSchema = new Schema(
-  {
-    RegistrationNumber: {
-      type: Schema.Types.ObjectId,
-      ref: "Student",
-      required: true,
-    },
-    message: {
-      type: String,
-      required: true,
-    },
-    isRead: {
-      type: Boolean,
-      default: false,
-    },
-    type: {
-      type: String,
-      enum: ["leave", "certificate", "general"],
-      default: "general",
-    },
+const NotificationModel=new Schema({
+  studentID:{
+    type:Schema.Types.ObjectId,
+    required:true
   },
-  { timestamps: true }
-);
+  mail_log:{
+    type:String,
+    required:true,
+  }
 
 
-const NotificationsModel=mongoose.model("Notifications",NotificationsModelSchema)
-export default NotificationsModel
+
+},{timestamps:true})
+
+const Notification=mongoose.Schema("Notification",NotificationModel)
+export default Notification
