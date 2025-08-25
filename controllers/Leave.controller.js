@@ -1,23 +1,40 @@
 // controller.js
 import LeaveModel from "../models/Leave.model.js";
 import Student from "../models/studentRegister.model.js";
-import cloudinary from "../config/cloudinary.js"
+import cloudinary from "../config/cloudinary.js";
 import fs from "fs";
 import mime from "mime-types";
 export const handleLeaves = async (req, res) => {
   try {
     const student = await Student.findById(req.user.id);
+    
+    
 
     let supportingDocumentUrl = null;
 
     if (req.file) {
+      const fileType = mime.lookup(req.file.originalname);
       const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "auto", // handles pdf, image, etc.
+        resource_type: "raw", // handles pdf, image, etc.
+        folder: "uploads",
+        type: "upload",
+        use_filename: true,
+        unique_filename: false,
       });
 
       supportingDocumentUrl = result.secure_url;
 
-      // delete local file
+      if (
+        fileType === "application/pdf" ||
+        fileType === "application/msword" ||
+        fileType ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        fileType ===
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      ) {
+        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
+      }
+
       fs.unlinkSync(req.file.path);
     }
 
@@ -55,7 +72,7 @@ export const getAllLeaves = async (req, res) => {
 };
 export const UpdateLeaves = async (req, res) => {
   try {
-    const { leaveId, status } = req.body;
+    const { leaveId, status,remark } = req.body;
     const validStatus = ["approved", "rejected", "pending"];
 
     if (!leaveId)
@@ -65,7 +82,7 @@ export const UpdateLeaves = async (req, res) => {
 
     const updateStatus = await LeaveModel.findByIdAndUpdate(
       leaveId,
-      { status },
+      { status,remark },
       { new: true }
     ).populate("studentId");
 

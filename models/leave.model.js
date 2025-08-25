@@ -18,7 +18,13 @@ const LeaveModelSchema = new Schema(
     supportingDocument:{
       type:String,
       required:false
-    }
+    },
+    remark:{
+      type:String,
+      required:false,
+      default:"No Remarks"
+
+    },
   },
   { timestamps: true }
 );
