@@ -6,5 +6,5 @@ import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 import { upload } from "../middleware/multer.js";
 router.post("/submitCertificate",verifyAccessToken,upload.single("supportingDocument"),handleCertificateRequests);
 router.get("/showCertificates",verifyAccessToken1,getAllCertificates);
-router.put("/updateCertificates",verifyAccessToken1,UpdateCertificates);
+router.put("/updateCertificates",verifyAccessToken1,upload.single("addCertificate"),UpdateCertificates);
 export default router;

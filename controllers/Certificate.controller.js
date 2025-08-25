@@ -103,7 +103,7 @@ export const UpdateCertificates = async (req, res) => {
 
     const updateStatus = await Certificate.findByIdAndUpdate(
       certId,
-      { status, remark},
+      { status, remark,addCertificate:addCertificateURL},
       { new: true }
     ).populate("student");
 
