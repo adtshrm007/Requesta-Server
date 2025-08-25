@@ -1,28 +1,44 @@
 import Certificate from "../models/Certificate.model.js";
 import Student from "../models/studentRegister.model.js";
-import cloudinary from "../config/cloudinary.js"
-import fs from "fs"
+import cloudinary from "../config/cloudinary.js";
+
+import fs from "fs";
+import mime from "mime-types";
 export const handleCertificateRequests = async (req, res) => {
   try {
     const student = await Student.findById(req.user.id);
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
-    let supportingDocumentUrl=null;
-    if(req.file){
-      const result=await cloudinary.uploader.upload(req.file.path,{
-        resource_type:"auto"
-      })
-      supportingDocumentUrl=result.secure_url;
+    let supportingDocumentUrl = null;
+    if (req.file) {
+      const fileType = mime.lookup(req.file.originalname);
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw",
+        folder: "uploads",
+        use_filename: true,
+        unique_filename: false,
+      });
+      supportingDocumentUrl = result.secure_url;
 
-      fs.unlinkSync(req.file.path)
+      if (
+        fileType === "application/pdf" ||
+        fileType === "application/msword" ||
+        fileType ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        fileType ===
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      ) {
+        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
+      }
 
+      fs.unlinkSync(req.file.path);
     }
     const newCertificate = new Certificate({
       student: student._id,
       purpose: req.body.purpose,
       CertificateType: req.body.CertificateType,
-      supportingDocument:supportingDocumentUrl
+      supportingDocument: supportingDocumentUrl,
     });
     await newCertificate.save();
     return res.status(201).json({
@@ -50,17 +66,44 @@ export const getAllCertificates = async (req, res) => {
 
 export const UpdateCertificates = async (req, res) => {
   try {
-    const { certId, status } = req.body;
+    const { certId, status, remark } = req.body;
     const validStatus = ["approved", "rejected", "pending"];
 
     if (!certId)
       return res.status(400).json({ message: "Certificate ID is required" });
     if (!validStatus.includes(status))
       return res.status(400).json({ message: "Invalid status value" });
+    let addCertificateURL = null;
+
+    if (req.file) {
+      const fileType = mime.lookup(req.file.originalname);
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw",
+        folder: "uploads",
+        type: "upload",
+        use_filename: true,
+        unique_filename: false,
+      });
+
+      addCertificateURL = result.secure_url;
+
+      if (
+        fileType === "application/pdf" ||
+        fileType === "application/msword" ||
+        fileType ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        fileType ===
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      ) {
+        addCertificateURL = `https://docs.google.com/gview?url=${addCertificateURL}&embedded=true`;
+      }
+
+      fs.unlinkSync(req.file.path);
+    }
 
     const updateStatus = await Certificate.findByIdAndUpdate(
       certId,
-      { status },
+      { status, remark},
       { new: true }
     ).populate("student");
 
