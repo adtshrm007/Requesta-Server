@@ -3,7 +3,9 @@ import Student from "../models/studentRegister.model.js";
 import LeaveModel from "../models/Leave.model.js";
 import Certificate from "../models/Certificate.model.js";
 import { transport } from "../config/nodemailer.js";
+import { mailTemplate } from "../templates/ForgotPassword.template.js";
 import { registrationTemplate } from "../templates/Registration.template.js";
+import otp from "../models/OTP.model.js";
 export const registerStudent = async (req, res) => {
   try {
     const { registrationNumber, name, email, password, branch, year } =
@@ -72,6 +74,80 @@ export const loginStudent = async (req, res) => {
       accessToken,
     });
   } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+export const sendOTP = async (req, res) => {
+  const { registrationNumber, email } = req.body;
+  try {
+    const student = await Student.findOne({
+      registrationNumber,
+      email,
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const otpCode = Math.floor(Math.random() * 1000000);
+    const newOTP = new otp({
+      student: student._id,
+      otp: otpCode,
+    });
+    await newOTP.save();
+    (async () => {
+      try {
+        const { subject, text } = mailTemplate(student.name, otpCode);
+        await transport.sendMail({
+          from: '"Requesta Portal" <adtshrm1@gmail.com>',
+          to: email,
+          subject,
+          text,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration email:", emailErr);
+      }
+    })();
+    return res
+      .status(200)
+      .json({ message: "OTP sent successfully", data: newOTP });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const loginStudentUsingEmail = async (req, res) => {
+  const { registrationNumber, email, otp: enteredOTP } = req.body;
+  try {
+    const student = await Student.findOne({
+      registrationNumber,
+      email,
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const otpRecord = await otp
+      .findOne({ student: student._id })
+      .sort({ createdAt: -1 });
+    if (!otpRecord) {
+      return res.status(400).json({ message: "No OTP found" });
+    }
+    const isMatch = await otpRecord.isOTPCorrect(enteredOTP);
+    if (!isMatch) {
+      return res.status(201).json({ message: "Wrong OTP" });
+    }
+    const refreshToken = student.generateRefreshToken();
+    const accessToken = student.generateAccessToken();
+    student.refreshToken = refreshToken;
+    await student.save();
+    res.json({
+      message: "Student Found",
+      data: student,
+      accessToken,
+    });
+  } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
 };

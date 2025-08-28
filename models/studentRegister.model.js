@@ -75,6 +75,6 @@ studentRegisterSchema.methods.generateRefreshToken=function(){
 }
 
 
-const Student = mongoose.model("Student", studentRegisterSchema);
+const Student = mongoose.model("studentRegister", studentRegisterSchema);
 
 export default Student;
