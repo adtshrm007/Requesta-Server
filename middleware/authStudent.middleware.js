@@ -22,7 +22,7 @@ export const verifyAccessToken = async (req, res, next) => {
       id: student._id,
       registrationNumber: student.registrationNumber,
       name: student.name,
-      mobileNumber:student.mobileNumber,
+      email:student.email,
       branch: student.branch,
       year: student.year,
     };

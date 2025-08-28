@@ -1,7 +1,9 @@
 import Certificate from "../models/Certificate.model.js";
 import Student from "../models/studentRegister.model.js";
 import cloudinary from "../config/cloudinary.js";
-
+import { transport } from "../config/nodemailer.js";
+import { certificateSubmissionTemplate } from "../templates/CertificateSubmission.template.js";
+import { certificateUpdateTemplate } from "../templates/CertificateUpdate.template.js";
 import fs from "fs";
 import mime from "mime-types";
 export const handleCertificateRequests = async (req, res) => {
@@ -41,6 +43,20 @@ export const handleCertificateRequests = async (req, res) => {
       supportingDocument: supportingDocumentUrl,
     });
     await newCertificate.save();
+    (async () => {
+          try {
+            const { subject, text, html } = certificateSubmissionTemplate(student.name);
+            await transport.sendMail({
+              from: '"Requesta  Portal" <adtshrm1@gmail.com>',
+              to: student.email,
+              subject,
+              text,
+              html,
+            });
+          } catch (emailErr) {
+            console.error("Error sending registration email:", emailErr);
+          }
+        })();
     return res.status(201).json({
       message: "Certificate request submitted successfully",
       data: newCertificate,
@@ -109,6 +125,21 @@ export const UpdateCertificates = async (req, res) => {
 
     if (!updateStatus)
       return res.status(404).json({ message: "Certificate not found" });
+
+    (async () => {
+          try {
+            const { subject, text, html } = certificateUpdateTemplate(updateStatus.student.name,updateStatus.purpose,updateStatus.status);
+            await transport.sendMail({
+              from: '"Requesta  Portal" <adtshrm1@gmail.com>',
+              to: updateStatus.student.email,
+              subject,
+              text,
+              html,
+            });
+          } catch (emailErr) {
+            console.error("Error sending registration email:", emailErr);
+          }
+        })();
 
     return res
       .status(200)

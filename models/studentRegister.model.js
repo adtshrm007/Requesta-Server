@@ -12,11 +12,10 @@ const studentRegisterSchema = new Schema({
     type: String,
     required: true
   },
-  mobileNumber: {
-    type: String,
-    required: true,
-    unique: true,
-    match: /^[6-9]\d{9}$/  // Optional: Validates Indian mobile numbers
+  email:{
+    type:String,
+    required:true
+
   },
   password:{
     type:String,
@@ -51,7 +50,7 @@ studentRegisterSchema.methods.generateAccessToken=function(){
      _id:this._id,
      registrationNumber:this.registrationNumber,
      name:this.name,
-     mobileNumber:this.mobileNumber,
+     email:this.email,
      branch:this.branch,
      year:this.year
 

@@ -2,31 +2,48 @@
 import Student from "../models/studentRegister.model.js";
 import LeaveModel from "../models/Leave.model.js";
 import Certificate from "../models/Certificate.model.js";
+import { transport } from "../config/nodemailer.js";
+import { registrationTemplate } from "../templates/Registration.template.js";
 export const registerStudent = async (req, res) => {
   try {
-    const { registrationNumber, name, mobileNumber,password, branch, year } = req.body;
+    const { registrationNumber, name, email, password, branch, year } =
+      req.body;
     const existing = await Student.findOne({
       $or: [
         { registrationNumber: req.body.registrationNumber },
-        { mobileNumber: req.body.mobileNumber },
+        { email: req.body.email },
       ],
     });
 
     if (existing) {
       return res.status(400).json({
-        message: "Student already registered with this reg. no or mobile no",
+        message: "Student already registered with this reg. no or email",
       });
     }
 
     const newStudent = new Student({
       registrationNumber,
       name,
-      mobileNumber,
+      email,
       password,
       branch,
       year,
     });
     await newStudent.save();
+    (async () => {
+      try {
+        const { subject, text, html } = registrationTemplate(name, email);
+        await transport.sendMail({
+          from: '"Requesta Portal" <adtshrm1@gmail.com>',
+          to: email,
+          subject,
+          text,
+          html,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration email:", emailErr);
+      }
+    })();
 
     res.status(201).json({ message: "Student registered", data: newStudent });
   } catch (err) {
@@ -35,25 +52,25 @@ export const registerStudent = async (req, res) => {
 };
 
 export const loginStudent = async (req, res) => {
-  const { registrationNumber,password} = req.body;
+  const { registrationNumber, password } = req.body;
   try {
-    const student = await Student.findOne({ registrationNumber});
-     if (!student) {
+    const student = await Student.findOne({ registrationNumber });
+    if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
     const isMatch = await student.isPasswordCorrect(password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-      const accessToken = student.generateAccessToken();
-      const refreshToken = student.generateRefreshToken();
-      student.refreshToken = refreshToken;
-      await student.save();
-      res.json({
-        message: "Student Found",
-        data: student,
-        accessToken,
-      });
+    const accessToken = student.generateAccessToken();
+    const refreshToken = student.generateRefreshToken();
+    student.refreshToken = refreshToken;
+    await student.save();
+    res.json({
+      message: "Student Found",
+      data: student,
+      accessToken,
+    });
   } catch (error) {
     res.status(500).json({ error: "Server error" });
   }
@@ -61,11 +78,11 @@ export const loginStudent = async (req, res) => {
 
 export const updateStudent = async (req, res) => {
   try {
-    const { name, mobileNumber, password,branch, year } = req.body;
+    const { name, email, password, branch, year } = req.body;
 
     const updatedStudent = await Student.findOneAndUpdate(
       { registrationNumber: req.user.registrationNumber }, // or use _id: req.user.id
-      { name, mobileNumber, password, branch, year },
+      { name, email, password, branch, year },
       { new: true }
     );
 
@@ -98,14 +115,8 @@ export const getCertificates = async (req, res) => {
     const certificates = await Certificate.find({ student: req.user.id })
       .populate("student")
       .sort({ createdAt: -1 });
-    
-    if (!certificates || certificates.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No certificates found for this student" });
-    }
+
     res.status(200).json(certificates);
-    
   } catch (err) {
     console.error("Error fetching certificates:", err);
     res.status(500).json({ error: "Server error while fetching certificates" });

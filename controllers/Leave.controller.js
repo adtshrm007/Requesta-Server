@@ -2,13 +2,14 @@
 import LeaveModel from "../models/Leave.model.js";
 import Student from "../models/studentRegister.model.js";
 import cloudinary from "../config/cloudinary.js";
+import { leaveSubmissionTemplate } from "../templates/LeaveSubmission.template.js";
+import { transport } from "../config/nodemailer.js";
+import { leaveUpdateTemplate } from "../templates/LeaveUpdate.template.js";
 import fs from "fs";
 import mime from "mime-types";
 export const handleLeaves = async (req, res) => {
   try {
     const student = await Student.findById(req.user.id);
-    
-    
 
     let supportingDocumentUrl = null;
 
@@ -48,6 +49,20 @@ export const handleLeaves = async (req, res) => {
     });
 
     await newLeave.save();
+    (async () => {
+      try {
+        const { subject, text, html } = leaveSubmissionTemplate(student.name);
+        await transport.sendMail({
+          from: '"Requesta  Portal" <adtshrm1@gmail.com>',
+          to: student.email,
+          subject,
+          text,
+          html,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration email:", emailErr);
+      }
+    })();
 
     res.status(201).json({
       message: "Leave Application Sent",
@@ -72,7 +87,7 @@ export const getAllLeaves = async (req, res) => {
 };
 export const UpdateLeaves = async (req, res) => {
   try {
-    const { leaveId, status,remark } = req.body;
+    const { leaveId, status, remark } = req.body;
     const validStatus = ["approved", "rejected", "pending"];
 
     if (!leaveId)
@@ -82,9 +97,23 @@ export const UpdateLeaves = async (req, res) => {
 
     const updateStatus = await LeaveModel.findByIdAndUpdate(
       leaveId,
-      { status,remark },
+      { status, remark },
       { new: true }
     ).populate("studentId");
+    (async () => {
+      try {
+        const { subject, text, html } = leaveUpdateTemplate(updateStatus.studentName,updateStatus.subject,updateStatus.status);
+        await transport.sendMail({
+          from: '"Requesta  Portal" <adtshrm1@gmail.com>',
+          to: updateStatus.studentId.email,
+          subject,
+          text,
+          html,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration email:", emailErr);
+      }
+    })();
 
     if (!updateStatus)
       return res.status(404).json({ message: "Leave not found" });

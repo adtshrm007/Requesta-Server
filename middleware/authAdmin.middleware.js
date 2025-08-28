@@ -24,7 +24,7 @@ export const verifyAccessToken1 = async (req, res, next) => {
       id: admin._id,
       adminID: admin.adminID,
       name: admin.name,
-      mobileNumber: admin.mobileNumber,
+      email: admin.email,
       department: admin.department,
       refreshToken: admin.refreshToken,
     };

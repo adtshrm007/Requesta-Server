@@ -11,17 +11,14 @@ const adminRegister = new Schema(
     password:{
       type:String,
       required:true
-
     },
     name: {
       type: String,
       required: true,
     },
-    mobileNumber: {
+    email: {
       type: String,
       required: true,
-      unique: true,
-      match: /^[6-9]\d{9}$/, // Optional: Validates Indian mobile numbers
     },
     department: {
       type: String,
@@ -51,7 +48,7 @@ adminRegister.methods.generateAccessToken = function () {
       _id: this._id,
       adminID: this.adminID,
       name: this.name,
-      mobileNumber: this.mobileNumber,
+      email: this.email,
       department: this.department,
       refreshToken: this.refreshToken,
     },
@@ -74,6 +71,6 @@ adminRegister.methods.generateRefreshToken=function(){
   )
 }
 
-const AdminRegister = mongoose.model("Admin Register", adminRegister);
+const AdminRegister = mongoose.model("AdminRegister", adminRegister);
 
 export default AdminRegister;
