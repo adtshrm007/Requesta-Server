@@ -114,7 +114,38 @@ export const sendOTP = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+export const handlePasswordChange = async (req, res) => {
+  const { otp: enteredOTP, password } = req.body;
+  try {
+    const student = await studentRegister.findOne({
+      registrationNumber: req.user.registrationNumber,
+      email: req.user.email,
+    });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
 
+    const otpRecord = await otp
+      .findOne({ student: student._id })
+      .sort({ createdAt: -1 });
+    if (!otpRecord) {
+      return res.status(400).json({ message: "No OTP found" });
+    }
+    const isMatch = await otpRecord.isOTPCorrect(enteredOTP);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Wrong OTP" });
+    }
+
+    student.password = password;
+    await student.save();
+
+    res.status(200).json({
+      message: "Password updated Successfully",
+    });
+  } catch (err) {
+    return err;
+  }
+};
 export const loginStudentUsingEmail = async (req, res) => {
   const { registrationNumber, email, otp: enteredOTP } = req.body;
   try {
@@ -153,8 +184,11 @@ export const loginStudentUsingEmail = async (req, res) => {
 
 export const updateStudent = async (req, res) => {
   try {
-    const { name, email, password, branch, year } = req.body;
-    const checkPreExisting = await studentRegister.findOne({ email });
+    const { name, email, branch, year } = req.body;
+    const checkPreExisting = await studentRegister.findOne({
+      email,
+      registrationNumber: { $ne: req.user.registrationNumber },
+    });
     if (checkPreExisting) {
       return res
         .status(400)
@@ -162,7 +196,7 @@ export const updateStudent = async (req, res) => {
     }
 
     const updatedStudent = await studentRegister.findOneAndUpdate(
-      { registrationNumber: req.user.registrationNumber }, // or use _id: req.user.id
+      { registrationNumber: req.user.registrationNumber },
       { name, email, branch, year },
       { new: true }
     );
