@@ -4,7 +4,7 @@ const CertificateModel = new Schema(
   {
     student: {
       type: Schema.Types.ObjectId,
-      ref: "Student",
+      ref: "studentRegister",
       required: true,
     },
     purpose: {

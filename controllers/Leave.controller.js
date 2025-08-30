@@ -1,6 +1,6 @@
 // controller.js
 import LeaveModel from "../models/Leave.model.js";
-import Student from "../models/studentRegister.model.js";
+import studentRegister from "../models/studentRegister.model.js";
 import cloudinary from "../config/cloudinary.js";
 import { leaveSubmissionTemplate } from "../templates/LeaveSubmission.template.js";
 import { transport } from "../config/nodemailer.js";
@@ -9,7 +9,7 @@ import fs from "fs";
 import mime from "mime-types";
 export const handleLeaves = async (req, res) => {
   try {
-    const student = await Student.findById(req.user.id);
+    const student = await studentRegister.findById(req.user.id);
 
     let supportingDocumentUrl = null;
 

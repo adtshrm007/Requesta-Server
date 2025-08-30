@@ -2,7 +2,7 @@ import mongoose, { Schema } from "mongoose";
 
 const LeaveModelSchema = new Schema(
   {
-    studentId: { type: Schema.Types.ObjectId, ref: "Student", required: true },
+    studentId: { type: Schema.Types.ObjectId, ref: "studentRegister", required: true },
     studentName: { type: String, required: true },
     studentRegNumber: { type: String, required: true },
     subject: { type: String, required: true },

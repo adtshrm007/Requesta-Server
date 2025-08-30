@@ -1,5 +1,4 @@
-// Student.controller.js
-import Student from "../models/studentRegister.model.js";
+import studentRegister from "../models/studentRegister.model.js";
 import LeaveModel from "../models/Leave.model.js";
 import Certificate from "../models/Certificate.model.js";
 import { transport } from "../config/nodemailer.js";
@@ -10,7 +9,7 @@ export const registerStudent = async (req, res) => {
   try {
     const { registrationNumber, name, email, password, branch, year } =
       req.body;
-    const existing = await Student.findOne({
+    const existing = await studentRegister.findOne({
       $or: [
         { registrationNumber: req.body.registrationNumber },
         { email: req.body.email },
@@ -23,7 +22,7 @@ export const registerStudent = async (req, res) => {
       });
     }
 
-    const newStudent = new Student({
+    const newStudent = new studentRegister({
       registrationNumber,
       name,
       email,
@@ -56,7 +55,7 @@ export const registerStudent = async (req, res) => {
 export const loginStudent = async (req, res) => {
   const { registrationNumber, password } = req.body;
   try {
-    const student = await Student.findOne({ registrationNumber });
+    const student = await studentRegister.findOne({ registrationNumber });
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
@@ -80,7 +79,7 @@ export const loginStudent = async (req, res) => {
 export const sendOTP = async (req, res) => {
   const { registrationNumber, email } = req.body;
   try {
-    const student = await Student.findOne({
+    const student = await studentRegister.findOne({
       registrationNumber,
       email,
     });
@@ -119,7 +118,7 @@ export const sendOTP = async (req, res) => {
 export const loginStudentUsingEmail = async (req, res) => {
   const { registrationNumber, email, otp: enteredOTP } = req.body;
   try {
-    const student = await Student.findOne({
+    const student = await studentRegister.findOne({
       registrationNumber,
       email,
     });
@@ -155,10 +154,16 @@ export const loginStudentUsingEmail = async (req, res) => {
 export const updateStudent = async (req, res) => {
   try {
     const { name, email, password, branch, year } = req.body;
+    const checkPreExisting = await studentRegister.findOne({ email });
+    if (checkPreExisting) {
+      return res
+        .status(400)
+        .json({ message: "This email is already registered" });
+    }
 
-    const updatedStudent = await Student.findOneAndUpdate(
+    const updatedStudent = await studentRegister.findOneAndUpdate(
       { registrationNumber: req.user.registrationNumber }, // or use _id: req.user.id
-      { name, email, password, branch, year },
+      { name, email, branch, year },
       { new: true }
     );
 

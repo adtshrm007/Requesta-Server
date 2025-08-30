@@ -26,14 +26,14 @@ const studentRegisterSchema = new Schema({
     required: true
   },
   year: {
-    type: Number, // or use enum if it's fixed
+    type: Number, 
     required: true,
   },
   refreshToken:{
     type:String
 
   }
-}, { timestamps: true }); // Adds createdAt and updatedAt fields
+}, { timestamps: true }); 
 
 studentRegisterSchema.pre("save",async function(next){
   if(!this.isModified("password")) return next();
@@ -75,6 +75,6 @@ studentRegisterSchema.methods.generateRefreshToken=function(){
 }
 
 
-const Student = mongoose.model("studentRegister", studentRegisterSchema);
+const studentRegister = mongoose.model("studentRegister", studentRegisterSchema);
 
-export default Student;
+export default studentRegister;

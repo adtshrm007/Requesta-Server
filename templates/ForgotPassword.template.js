@@ -1,8 +1,8 @@
-export const mailTemplate = (userName,otp) => ({
-  subject: "📩 Certificate Request Reviewed – Requesta Portal",
+export const mailTemplate = (userName, otp) => ({
+  subject: "📩 Login using Email – Requesta Portal",
   text: `Hello ${userName},
 
-Your otp to change password is ${otp}. 
+Your otp is ${otp}. 
 
 Thank you,
 The Requesta Team
