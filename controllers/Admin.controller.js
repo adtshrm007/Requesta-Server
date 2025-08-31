@@ -4,6 +4,8 @@ import Student from "../models/studentRegister.model.js";
 import { transport } from "../config/nodemailer.js";
 import { registrationAdminTemplate } from "../templates/RegistrationAdmin.template.js";
 import Certificate from "../models/Certificate.model.js";
+import OTPAdmin from "../models/OTPAdmin.model.js";
+import { mailTemplate } from "../templates/ForgotPassword.template.js";
 export const registerAdmin = async (req, res) => {
   try {
     const { adminID, password, name, email, department } = req.body;
@@ -70,9 +72,125 @@ export const getAdminById = async (req, res) => {
   }
 };
 
+export const sendOTP = async (req, res) => {
+  const { adminID, email } = req.body;
+  try {
+    const admin = await AdminRegister.findOne({
+      adminID,
+      email,
+    });
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    const otpCode = Math.floor(Math.random() * 1000000);
+    const newOTP = new OTPAdmin({
+      admin: admin._id,
+      otp: otpCode,
+    });
+    await newOTP.save();
+    (async () => {
+      try {
+        const { subject, text } = mailTemplate(admin.name, otpCode);
+        await transport.sendMail({
+          from: '"Requesta Portal" <adtshrm1@gmail.com>',
+          to: email,
+          subject,
+          text,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration email:", emailErr);
+      }
+    })();
+    return res
+      .status(200)
+      .json({ message: "OTP sent successfully", data: newOTP });
+  } catch (err) {
+    console.log(err)
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+export const handlePasswordChange = async (req, res) => {
+  const { otp: enteredOTP, password } = req.body;
+  try {
+    const admin = await AdminRegister.findOne({
+      adminID: req.user.adminID,
+      email: req.user.email,
+    });
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    const otpRecord = await OTPAdmin
+      .findOne({ admin: admin._id })
+      .sort({ createdAt: -1 });
+    if (!otpRecord) {
+      return res.status(400).json({ message: "No OTP found" });
+    }
+    const isMatch = await otpRecord.isOTPCorrect(enteredOTP);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Wrong OTP" });
+    }
+
+    admin.password = password;
+    await admin.save();
+
+    res.status(200).json({
+      message: "Password updated Successfully",
+    });
+  } catch (err) {
+    return err;
+  }
+};
+export const loginAdminUsingEmail = async (req, res) => {
+  const { adminID, email, otp: enteredOTP } = req.body;
+  try {
+    const admin = await AdminRegister.findOne({
+      adminID,
+      email,
+    });
+
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    const otpRecord = await OTPAdmin
+      .findOne({ admin: admin._id })
+      .sort({ createdAt: -1 });
+    if (!otpRecord) {
+      return res.status(400).json({ message: "No OTP found" });
+    }
+    const isMatch = await otpRecord.isOTPCorrect(enteredOTP);
+    if (!isMatch) {
+      return res.status(201).json({ message: "Wrong OTP" });
+    }
+    const refreshToken = admin.generateRefreshToken();
+    const accessToken = admin.generateAccessToken();
+    admin.refreshToken = refreshToken;
+    await admin.save();
+    res.json({
+      message: "Admin Found",
+      data: admin,
+      accessToken,
+    });
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+
 export const updateAdmin = async (req, res) => {
   try {
     const { name, email, department } = req.body;
+    const checkPreExisting=await AdminRegister.findOne({
+      email,
+      adminID:{$ne:req.user.adminID}
+    })
+    if(checkPreExisting){
+      return  res.status(400).json({message:"This email is already registered"})
+    }
     const updatedAdmin = await AdminRegister.findOneAndUpdate(
       {
         adminID: req.body.adminID,

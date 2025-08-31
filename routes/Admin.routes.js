@@ -1,12 +1,15 @@
 import express from "express";
 
-import { registerAdmin,updateAdmin,getAdminById ,getAllStudentsDataForAdmin,getRequetsOfAStudentForAdmin,getCertificateRequetsOfAStudentForAdmin} from "../controllers/Admin.controller.js";
+import { registerAdmin,updateAdmin,getAdminById ,getAllStudentsDataForAdmin,getRequetsOfAStudentForAdmin,getCertificateRequetsOfAStudentForAdmin,sendOTP,handlePasswordChange,loginAdminUsingEmail} from "../controllers/Admin.controller.js";
 import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 
 const router=express.Router();
 
 router.post("/register",registerAdmin)
 router.post("/get",getAdminById);
+router.post("/otp",sendOTP);
+router.post("/email",loginAdminUsingEmail);
+router.put("/changepassword",verifyAccessToken1,handlePasswordChange)
 router.get("/dashboard",verifyAccessToken1,(req,res)=>{
     res.json({ data:req.user });
 })
