@@ -26,6 +26,13 @@ export const verifyAccessToken1 = async (req, res, next) => {
       name: admin.name,
       email: admin.email,
       department: admin.department,
+      role:admin.role,
+      pendingLeaveRequests: admin.pendingLeaveRequests,
+      acceptedLeaveRequets: admin.acceptedLeaveRequests,
+      rejectedLeaveRequets: admin.rejectedLeaveRequests,
+      pendingCertificateRequets: admin.pendingCertificateRequests,
+      acceptedCertificateRequets: admin.acceptedCertificateRequests,
+      rejectedCertificateRequets: admin.rejectedCertificateRequests,
       refreshToken: admin.refreshToken,
     };
 
@@ -34,3 +41,5 @@ export const verifyAccessToken1 = async (req, res, next) => {
     return res.status(403).json({ message: "Invalid or expired token" });
   }
 };
+
+

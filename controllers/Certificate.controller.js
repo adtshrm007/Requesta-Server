@@ -44,19 +44,21 @@ export const handleCertificateRequests = async (req, res) => {
     });
     await newCertificate.save();
     (async () => {
-          try {
-            const { subject, text, html } = certificateSubmissionTemplate(student.name);
-            await transport.sendMail({
-              from: '"Requesta  Portal" <adtshrm1@gmail.com>',
-              to: student.email,
-              subject,
-              text,
-              html,
-            });
-          } catch (emailErr) {
-            console.error("Error sending registration email:", emailErr);
-          }
-        })();
+      try {
+        const { subject, text, html } = certificateSubmissionTemplate(
+          student.name
+        );
+        await transport.sendMail({
+          from: '"Requesta  Portal" <adtshrm1@gmail.com>',
+          to: student.email,
+          subject,
+          text,
+          html,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration email:", emailErr);
+      }
+    })();
     return res.status(201).json({
       message: "Certificate request submitted successfully",
       data: newCertificate,
@@ -119,27 +121,41 @@ export const UpdateCertificates = async (req, res) => {
 
     const updateStatus = await Certificate.findByIdAndUpdate(
       certId,
-      { status, remark,addCertificate:addCertificateURL},
+      { status, remark, addCertificate: addCertificateURL },
       { new: true }
     ).populate("student");
+
+    if (status === "rejected") {
+      await AdminRegister.findByIdAndUpdate(req.user.adminID, {
+        $inc: { rejectedLeaveRequests: 1 },
+      });
+    } else if (status === "approved") {
+      await AdminRegister.findByIdAndUpdate(req.user.id, {
+        $inc: { acceptedLeaveRequests: 1 },
+      });
+    }
 
     if (!updateStatus)
       return res.status(404).json({ message: "Certificate not found" });
 
     (async () => {
-          try {
-            const { subject, text, html } = certificateUpdateTemplate(updateStatus.student.name,updateStatus.purpose,updateStatus.status);
-            await transport.sendMail({
-              from: '"Requesta  Portal" <adtshrm1@gmail.com>',
-              to: updateStatus.student.email,
-              subject,
-              text,
-              html,
-            });
-          } catch (emailErr) {
-            console.error("Error sending registration email:", emailErr);
-          }
-        })();
+      try {
+        const { subject, text, html } = certificateUpdateTemplate(
+          updateStatus.student.name,
+          updateStatus.purpose,
+          updateStatus.status
+        );
+        await transport.sendMail({
+          from: '"Requesta  Portal" <adtshrm1@gmail.com>',
+          to: updateStatus.student.email,
+          subject,
+          text,
+          html,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration email:", emailErr);
+      }
+    })();
 
     return res
       .status(200)

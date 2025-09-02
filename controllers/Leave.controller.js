@@ -7,6 +7,8 @@ import { transport } from "../config/nodemailer.js";
 import { leaveUpdateTemplate } from "../templates/LeaveUpdate.template.js";
 import fs from "fs";
 import mime from "mime-types";
+import AdminRegister from "../models/adminRegister.model.js";
+import { Admin } from "mongodb";
 export const handleLeaves = async (req, res) => {
   try {
     const student = await studentRegister.findById(req.user.id);
@@ -47,6 +49,7 @@ export const handleLeaves = async (req, res) => {
       Reason: req.body.Reason, // make sure your frontend also sends lowercase "reason"
       supportingDocument: supportingDocumentUrl,
     });
+
 
     await newLeave.save();
     (async () => {
@@ -100,9 +103,23 @@ export const UpdateLeaves = async (req, res) => {
       { status, remark },
       { new: true }
     ).populate("studentId");
+    if (status === "rejected") {
+      await AdminRegister.findByIdAndUpdate(
+        req.user.adminID,
+        { $inc: { rejectedLeaveRequests: 1 } } 
+      );
+    } else if (status === "approved") {
+      await AdminRegister.findByIdAndUpdate(req.user.id, {
+        $inc: { acceptedLeaveRequests: 1 },
+      });
+    }
     (async () => {
       try {
-        const { subject, text, html } = leaveUpdateTemplate(updateStatus.studentName,updateStatus.subject,updateStatus.status);
+        const { subject, text, html } = leaveUpdateTemplate(
+          updateStatus.studentName,
+          updateStatus.subject,
+          updateStatus.status
+        );
         await transport.sendMail({
           from: '"Requesta  Portal" <adtshrm1@gmail.com>',
           to: updateStatus.studentId.email,

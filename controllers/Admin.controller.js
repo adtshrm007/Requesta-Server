@@ -6,9 +6,10 @@ import { registrationAdminTemplate } from "../templates/RegistrationAdmin.templa
 import Certificate from "../models/Certificate.model.js";
 import OTPAdmin from "../models/OTPAdmin.model.js";
 import { mailTemplate } from "../templates/ForgotPassword.template.js";
+import { VerifyRole } from "../middleware/VerifyRole.js";
 export const registerAdmin = async (req, res) => {
   try {
-    const { adminID, password, name, email, department } = req.body;
+    const { adminID, password, name, email, department ,role} = req.body;
     const existing = await AdminRegister.findOne({
       $or: [{ adminID: req.body.adminID }, { email: req.body.email }],
     });
@@ -23,11 +24,12 @@ export const registerAdmin = async (req, res) => {
       name,
       email,
       department,
+      role
     });
     await newAdmin.save();
     (async () => {
       try {
-        const { subject, text, html } = registrationAdminTemplate(name, email);
+        const { subject, text, html } = registrationAdminTemplate(name, email,role);
         await transport.sendMail({
           from: '"Requesta Portal" <adtshrm1@gmail.com>',
           to: email,
@@ -71,7 +73,23 @@ export const getAdminById = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+export const getOtherAdminData=async(req,res)=>{
+  try{
+    const admin=await AdminRegister.findOne({
+      adminID:req.user.adminID,
+    })
+    if(!admin){
+      return res.status(404).json({message:"Admin not found"});
+    }
 
+    const admins=await AdminRegister.find({role:"Departmental Admin"});
+    return res.status(200).json({data:admins})
+
+  }
+  catch(err){
+    return res.status(500).json({message:"Server error"});
+  }
+}
 export const sendOTP = async (req, res) => {
   const { adminID, email } = req.body;
   try {
