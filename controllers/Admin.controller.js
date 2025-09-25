@@ -3,7 +3,7 @@ import LeaveModel from "../models/leave.model.js";
 import Student from "../models/studentRegister.model.js";
 import { transport } from "../config/nodemailer.js";
 import { registrationAdminTemplate } from "../templates/RegistrationAdmin.template.js";
-import Certificate from "../models/Certificate.model.js";
+import Certificate from "../models/certificate.model.js";
 import OTPAdmin from "../models/OTPAdmin.model.js";
 import { mailTemplate } from "../templates/ForgotPassword.template.js";
 export const registerAdmin = async (req, res) => {

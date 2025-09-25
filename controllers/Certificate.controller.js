@@ -1,4 +1,4 @@
-import Certificate from "../models/Certificate.model.js";
+import Certificate from "../models/certificate.model.js";
 import Student from "../models/studentRegister.model.js";
 import cloudinary from "../config/cloudinary.js";
 import { transport } from "../config/nodemailer.js";

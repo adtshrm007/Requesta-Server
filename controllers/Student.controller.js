@@ -1,6 +1,6 @@
 import studentRegister from "../models/studentRegister.model.js";
-import LeaveModel from "../models/Leave.model.js";
-import Certificate from "../models/Certificate.model.js";
+import LeaveModel from "../models/leave.model.js";
+import Certificate from "../models/certificate.model.js";
 import { transport } from "../config/nodemailer.js";
 import { mailTemplate } from "../templates/ForgotPassword.template.js";
 import { registrationTemplate } from "../templates/Registration.template.js";
