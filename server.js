@@ -7,7 +7,7 @@ import adminRoute from "./routes/Admin.routes.js";
 import studentRoute from "./routes/Student.routes.js";
 import leaveRoute from "./routes/Leave.routes.js"
 import certificateRoute from "./routes/Certificate.routes.js"
-
+import adminLeaveRoute from "./routes/LeaveAdmin.routes.js"
 
 import cors from "cors"
 
@@ -20,7 +20,7 @@ app.use("/api/adminregister", adminRoute);
 app.use("/api/studentregister", studentRoute);
 app.use("/api/leave",leaveRoute);
 app.use("/api/certificate",certificateRoute);
-
+app.use("/api/adminLeave",adminLeaveRoute);
 
 
 

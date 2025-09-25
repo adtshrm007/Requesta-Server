@@ -6,10 +6,9 @@ import { registrationAdminTemplate } from "../templates/RegistrationAdmin.templa
 import Certificate from "../models/Certificate.model.js";
 import OTPAdmin from "../models/OTPAdmin.model.js";
 import { mailTemplate } from "../templates/ForgotPassword.template.js";
-import { VerifyRole } from "../middleware/VerifyRole.js";
 export const registerAdmin = async (req, res) => {
   try {
-    const { adminID, password, name, email, department ,role} = req.body;
+    const { adminID, password, name, email, department, role } = req.body;
     const existing = await AdminRegister.findOne({
       $or: [{ adminID: req.body.adminID }, { email: req.body.email }],
     });
@@ -24,12 +23,16 @@ export const registerAdmin = async (req, res) => {
       name,
       email,
       department,
-      role
+      role,
     });
     await newAdmin.save();
     (async () => {
       try {
-        const { subject, text, html } = registrationAdminTemplate(name, email,role);
+        const { subject, text, html } = registrationAdminTemplate(
+          name,
+          email,
+          role
+        );
         await transport.sendMail({
           from: '"Requesta Portal" <adtshrm1@gmail.com>',
           to: email,
@@ -73,23 +76,29 @@ export const getAdminById = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-export const getOtherAdminData=async(req,res)=>{
-  try{
-    const admin=await AdminRegister.findOne({
-      adminID:req.user.adminID,
-    })
-    if(!admin){
-      return res.status(404).json({message:"Admin not found"});
+export const getFacultyAdmins = async (req, res) => {
+  try {
+    const admin = await AdminRegister.find({ role: "Faculty" });
+    if (!admin) {
+      return res.status(404).json({ message: "No admin found as faculty" });
     }
-
-    const admins=await AdminRegister.find({role:"Departmental Admin"});
-    return res.status(200).json({data:admins})
-
+    return res.status(200).json({ message: "Admins found", data: admin });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error" });
   }
-  catch(err){
-    return res.status(500).json({message:"Server error"});
+};
+export const getDepartmentalAdmin = async (req, res) => {
+  try {
+    const admin = await AdminRegister.find({ role: "Departmental Admin" });
+    if (!admin) {
+      return res.status(404).json({ message: "No Departmental Admin found" });
+    }
+    return res.status(200).json({ message: "Admin Found", data: admin });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ message: "Server error" });
   }
-}
+};
 export const sendOTP = async (req, res) => {
   const { adminID, email } = req.body;
   try {
@@ -125,7 +134,7 @@ export const sendOTP = async (req, res) => {
       .status(200)
       .json({ message: "OTP sent successfully", data: newOTP });
   } catch (err) {
-    console.log(err)
+    console.log(err);
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -140,9 +149,9 @@ export const handlePasswordChange = async (req, res) => {
       return res.status(404).json({ message: "Admin not found" });
     }
 
-    const otpRecord = await OTPAdmin
-      .findOne({ admin: admin._id })
-      .sort({ createdAt: -1 });
+    const otpRecord = await OTPAdmin.findOne({ admin: admin._id }).sort({
+      createdAt: -1,
+    });
     if (!otpRecord) {
       return res.status(400).json({ message: "No OTP found" });
     }
@@ -173,9 +182,9 @@ export const loginAdminUsingEmail = async (req, res) => {
       return res.status(404).json({ message: "Admin not found" });
     }
 
-    const otpRecord = await OTPAdmin
-      .findOne({ admin: admin._id })
-      .sort({ createdAt: -1 });
+    const otpRecord = await OTPAdmin.findOne({ admin: admin._id }).sort({
+      createdAt: -1,
+    });
     if (!otpRecord) {
       return res.status(400).json({ message: "No OTP found" });
     }
@@ -193,21 +202,22 @@ export const loginAdminUsingEmail = async (req, res) => {
       accessToken,
     });
   } catch (err) {
-    console.error(err)
+    console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-
 export const updateAdmin = async (req, res) => {
   try {
     const { name, email, department } = req.body;
-    const checkPreExisting=await AdminRegister.findOne({
+    const checkPreExisting = await AdminRegister.findOne({
       email,
-      adminID:{$ne:req.user.adminID}
-    })
-    if(checkPreExisting){
-      return  res.status(400).json({message:"This email is already registered"})
+      adminID: { $ne: req.user.adminID },
+    });
+    if (checkPreExisting) {
+      return res
+        .status(400)
+        .json({ message: "This email is already registered" });
     }
     const updatedAdmin = await AdminRegister.findOneAndUpdate(
       {

@@ -2,7 +2,11 @@ import mongoose, { Schema } from "mongoose";
 
 const LeaveModelSchema = new Schema(
   {
-    studentId: { type: Schema.Types.ObjectId, ref: "studentRegister", required: true },
+    studentId: {
+      type: Schema.Types.ObjectId,
+      ref: "studentRegister",
+      required: true,
+    },
     studentName: { type: String, required: true },
     studentRegNumber: { type: String, required: true },
     subject: { type: String, required: true },
@@ -12,18 +16,21 @@ const LeaveModelSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
+      enum: ["pending", "forwarded", "accepted", "rejected"],
       default: "pending",
     },
-    supportingDocument:{
-      type:String,
-      required:false
+    supportingDocument: {
+      type: String,
+      required: false,
     },
-    remark:{
-      type:String,
-      required:false,
-      default:"No Remarks"
-
+    remark: {
+      type: String,
+      required: false,
+      default: "No Remarks",
+    },
+    approvedBy: {
+      type: String,
+      default: null,
     },
   },
   { timestamps: true }

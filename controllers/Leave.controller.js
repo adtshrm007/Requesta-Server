@@ -8,7 +8,6 @@ import { leaveUpdateTemplate } from "../templates/LeaveUpdate.template.js";
 import fs from "fs";
 import mime from "mime-types";
 import AdminRegister from "../models/adminRegister.model.js";
-import { Admin } from "mongodb";
 export const handleLeaves = async (req, res) => {
   try {
     const student = await studentRegister.findById(req.user.id);
@@ -18,7 +17,7 @@ export const handleLeaves = async (req, res) => {
     if (req.file) {
       const fileType = mime.lookup(req.file.originalname);
       const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "raw", // handles pdf, image, etc.
+        resource_type: "raw", 
         folder: "uploads",
         type: "upload",
         use_filename: true,
@@ -46,10 +45,9 @@ export const handleLeaves = async (req, res) => {
       studentName: student.name,
       studentRegNumber: student.registrationNumber,
       subject: req.body.subject,
-      Reason: req.body.Reason, // make sure your frontend also sends lowercase "reason"
+      Reason: req.body.Reason,
       supportingDocument: supportingDocumentUrl,
     });
-
 
     await newLeave.save();
     (async () => {
@@ -88,27 +86,63 @@ export const getAllLeaves = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+export const getLeavesForSuperAdmin = async (req, res) => {
+  try {
+    const dept = req.user.department;
+    const leaves = await LeaveModel.find({ status: "approved" })
+      .populate({
+        path: "studentId",
+        match: { branch: dept },
+      })
+      .then((leaves) => leaves.filter((leave) => leave.studentId !== null));
+    res.json(leaves);
+  } catch (err) {
+    console.error("Error fetching leaves:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getLeavesForDepartmentalAdmin = async (req, res) => {
+  try {
+    const dept = req.user.department;
+    const leaves = await LeaveModel.find({ status: "forwarded" })
+      .populate({
+        path: "studentId",
+        match: { branch: dept },
+      })
+      .then((leaves) => leaves.filter((leave) => leave.studentId !== null));
+    res.json(leaves);
+  } catch (err) {
+    console.error("Error fetching leaves:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const UpdateLeaves = async (req, res) => {
   try {
     const { leaveId, status, remark } = req.body;
-    const validStatus = ["approved", "rejected", "pending"];
+    const validStatus = ["approved","forwarded", "rejected", "pending"];
 
     if (!leaveId)
       return res.status(400).json({ message: "Leave ID is required" });
     if (!validStatus.includes(status))
       return res.status(400).json({ message: "Invalid status value" });
 
+    const admin = await AdminRegister.findById(req.user.id);
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
     const updateStatus = await LeaveModel.findByIdAndUpdate(
       leaveId,
-      { status, remark },
+      { status, remark, approvedBy: admin.role },
       { new: true }
     ).populate("studentId");
     if (status === "rejected") {
-      await AdminRegister.findByIdAndUpdate(
-        req.user.adminID,
-        { $inc: { rejectedLeaveRequests: 1 } } 
-      );
-    } else if (status === "approved") {
+      await AdminRegister.findByIdAndUpdate(req.user.id, {
+        $inc: { rejectedLeaveRequests: 1 },
+      });
+    } else if (status === "approved"||status==="forwarded") {
       await AdminRegister.findByIdAndUpdate(req.user.id, {
         $inc: { acceptedLeaveRequests: 1 },
       });
@@ -118,7 +152,8 @@ export const UpdateLeaves = async (req, res) => {
         const { subject, text, html } = leaveUpdateTemplate(
           updateStatus.studentName,
           updateStatus.subject,
-          updateStatus.status
+          updateStatus.status,
+          updateStatus.approvedBy
         );
         await transport.sendMail({
           from: '"Requesta  Portal" <adtshrm1@gmail.com>',

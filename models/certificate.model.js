@@ -17,7 +17,7 @@ const CertificateModel = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
+      enum: ["pending", "forwarded", "accepted", "rejected"],
       default: "pending",
     },
     supportingDocument: {
@@ -30,7 +30,11 @@ const CertificateModel = new Schema(
     },
     addCertificate: {
       type: String,
-      default:""
+      default: "",
+    },
+    approvedBy: {
+      type: String,
+      default: null,
     },
   },
   { timestamps: true }

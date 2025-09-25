@@ -26,8 +26,7 @@ const adminRegister = new Schema(
     },
     role: {
       type: String,
-      enum: ["Super Admin", "Departmental Admin"],
-      default: "Departmental Admin",
+      enum: ["Super Admin", "Departmental Admin", "Faculty"],
     },
     pendingLeaveRequests: { type: Number, default: 0 },
     acceptedLeaveRequests: { type: Number, default: 0 },
@@ -35,7 +34,54 @@ const adminRegister = new Schema(
     pendingCertificateRequests: { type: Number, default: 0 },
     acceptedCertificateRequests: { type: Number, default: 0 },
     rejectedCertificateRequests: { type: Number, default: 0 },
-
+    totalLeaves: {
+      type: Number,
+      default: 15,
+    },
+    totalLeavesTaken: {
+      type: Number,
+      default: 0,
+    },
+    totalLeavesLeft: {
+      type: Number,
+      default: 15,
+    },
+    officialLeave: {
+      type: Number,
+      default: 5,
+    },
+    officialLeaveTaken: {
+      type: Number,
+      default: 0,
+    },
+    officialLeaveLeft: {
+      type: Number,
+      default: 5,
+    },
+    medicalLeave: {
+      type: Number,
+      default: 5,
+    },
+    medicalLeaveTaken: {
+      type: Number,
+      default: 0,
+    },
+    medicalLeaveLeft: {
+      type: Number,
+      default: 5,
+    },
+    casualLeave: {
+      type: Number,
+      default: 5,
+    },
+    casualLeaveTaken: {
+      type: Number,
+      default: 0,
+    },
+    casualLeaveLeft: {
+      type: Number,
+      default: 5,
+    },
     refreshToken: {
       type: String,
     },
@@ -68,6 +114,18 @@ adminRegister.methods.generateAccessToken = function () {
       pendingCertificateRequets: this.pendingCertificateRequests,
       acceptedCertificateRequets: this.acceptedCertificateRequests,
       rejectedCertificateRequets: this.rejectedCertificateRequests,
+      totalLeaves: this.totalLeaves,
+      totalLeavesLeft: this.totalLeavesLeft,
+      totalLeavesTaken: this.totalLeavesTaken,
+      officialLeave:this.officialLeave,
+      officialLeaveLeft:this.officialLeaveLeft,
+      officialLeaveTaken:this.officialLeaveTaken,
+      casualLeave:this.casualLeave,
+      casualLeaveLeft:this.casualLeaveLeft,
+      casualLeaveTaken:this.casualLeaveTaken,
+      medicalLeave:this.medicalLeave,
+      medicalLeaveLeft:this.medicalLeaveLeft,
+      medicalLeaveTaken:this.medicalLeaveTaken,
       refreshToken: this.refreshToken,
     },
     process.env.ACCESS_TOKEN_SECRET,

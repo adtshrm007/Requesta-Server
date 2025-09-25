@@ -6,6 +6,7 @@ import { certificateSubmissionTemplate } from "../templates/CertificateSubmissio
 import { certificateUpdateTemplate } from "../templates/CertificateUpdate.template.js";
 import fs from "fs";
 import mime from "mime-types";
+import AdminRegister from "../models/adminRegister.model.js";
 export const handleCertificateRequests = async (req, res) => {
   try {
     const student = await Student.findById(req.user.id);
@@ -85,7 +86,7 @@ export const getAllCertificates = async (req, res) => {
 export const UpdateCertificates = async (req, res) => {
   try {
     const { certId, status, remark } = req.body;
-    const validStatus = ["approved", "rejected", "pending"];
+    const validStatus = ["approved", "forwarded", "rejected", "pending"];
 
     if (!certId)
       return res.status(400).json({ message: "Certificate ID is required" });
@@ -119,9 +120,19 @@ export const UpdateCertificates = async (req, res) => {
       fs.unlinkSync(req.file.path);
     }
 
+    const admin = await AdminRegister.findById(req.user.id);
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
     const updateStatus = await Certificate.findByIdAndUpdate(
       certId,
-      { status, remark, addCertificate: addCertificateURL },
+      {
+        status,
+        remark,
+        addCertificate: addCertificateURL,
+        approvedBy: admin.role,
+      },
       { new: true }
     ).populate("student");
 
@@ -165,5 +176,20 @@ export const UpdateCertificates = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Server error", error: err.message });
+  }
+};
+
+export const getCertificateForSuperAdmin = async (req, res) => {
+  try {
+    const dept = req.user.department;
+    const cert = await Certificate.find({ approvedBy: "Departmental Admin" })
+      .populate({
+        path: "studentId",
+        match: { branch: dept },
+      })
+      .then((cert) => cert.filter((c) => c.student !== null));
+    res.json(cert);
+  } catch (err) {
+    return res.status(500).json({ message: "Server error" });
   }
 };

@@ -10,7 +10,8 @@ import {
   sendOTP,
   handlePasswordChange,
   loginAdminUsingEmail,
-  getOtherAdminData
+  getFacultyAdmins,
+  getDepartmentalAdmin,
 } from "../controllers/Admin.controller.js";
 import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 import { VerifyRole } from "../middleware/VerifyRole.js";
@@ -27,7 +28,18 @@ router.get("/dashboard", verifyAccessToken1, (req, res) => {
 });
 router.put("/update", verifyAccessToken1, updateAdmin);
 router.get("/students", verifyAccessToken1, getAllStudentsDataForAdmin);
-router.get("/admins",verifyAccessToken1,VerifyRole("Super Admin"),getOtherAdminData);
+router.get(
+  "/admins",
+  verifyAccessToken1,
+  VerifyRole("Departmental Admin"),
+  getFacultyAdmins
+);
+router.get(
+  "/departmentalAdmin",
+  verifyAccessToken1,
+  VerifyRole("Super Admin"),
+  getDepartmentalAdmin
+);
 router.get(
   "/studentRequests",
   verifyAccessToken1,
