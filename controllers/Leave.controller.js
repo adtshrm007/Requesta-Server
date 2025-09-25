@@ -1,5 +1,5 @@
 // controller.js
-import LeaveModel from "../models/Leave.model.js";
+import LeaveModel from "../models/leave.model.js";
 import studentRegister from "../models/studentRegister.model.js";
 import cloudinary from "../config/cloudinary.js";
 import { leaveSubmissionTemplate } from "../templates/LeaveSubmission.template.js";
