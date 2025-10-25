@@ -14,10 +14,14 @@ export const handleLeaves = async (req, res) => {
 
     let supportingDocumentUrl = null;
 
+    if (!fs.existsSync("./uploads")) {
+      fs.mkdirSync("./uploads");
+    }
+
     if (req.file) {
       const fileType = mime.lookup(req.file.originalname);
       const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "raw", 
+        resource_type: "raw",
         folder: "uploads",
         type: "upload",
         use_filename: true,
@@ -37,7 +41,13 @@ export const handleLeaves = async (req, res) => {
         supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
       }
 
-      fs.unlinkSync(req.file.path);
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (err) {
+          console.warn("Could not delete file:", err.message);
+        }
+      }
     }
 
     const newLeave = new LeaveModel({
@@ -121,7 +131,7 @@ export const getLeavesForDepartmentalAdmin = async (req, res) => {
 export const UpdateLeaves = async (req, res) => {
   try {
     const { leaveId, status, remark } = req.body;
-    const validStatus = ["approved","forwarded", "rejected", "pending"];
+    const validStatus = ["approved", "forwarded", "rejected", "pending"];
 
     if (!leaveId)
       return res.status(400).json({ message: "Leave ID is required" });
@@ -142,7 +152,7 @@ export const UpdateLeaves = async (req, res) => {
       await AdminRegister.findByIdAndUpdate(req.user.id, {
         $inc: { rejectedLeaveRequests: 1 },
       });
-    } else if (status === "approved"||status==="forwarded") {
+    } else if (status === "approved" || status === "forwarded") {
       await AdminRegister.findByIdAndUpdate(req.user.id, {
         $inc: { acceptedLeaveRequests: 1 },
       });
