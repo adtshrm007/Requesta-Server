@@ -1,12 +1,17 @@
-import multer from "multer"
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, './uploads')
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    cb(null, file.fieldname + '-' + uniqueSuffix)
-  }
-})
+// config/upload.js
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import cloudinary from "../config/cloudinary.js";
 
-export const upload = multer({ storage: storage })
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "uploads",      // folder in Cloudinary
+    resource_type: "raw",   // allows pdf, doc, docx, pptx
+    allowed_formats: ["pdf", "doc", "docx", "pptx"],
+    use_filename: true,
+    unique_filename: false,
+  },
+});
+
+export const upload = multer({ storage });
