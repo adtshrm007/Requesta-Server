@@ -164,7 +164,7 @@ export const UpdateLeaves = async (req, res) => {
   }
 };
 
-export const sendLeaveEmail = async (student) => {
+const sendLeaveEmail = async (student) => {
   try {
     const { subject, text, html } = leaveSubmissionTemplate(student.name);
     await transport.sendMail({
