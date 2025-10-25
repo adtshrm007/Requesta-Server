@@ -46,20 +46,7 @@ export const handleLeaves = async (req, res) => {
     });
 
     await newLeave.save();
-    (async () => {
-      try {
-        const { subject, text, html } = leaveSubmissionTemplate(student.name);
-        await transport.sendMail({
-          from: '"Requesta  Portal" <adtshrm1@gmail.com>',
-          to: student.email,
-          subject,
-          text,
-          html,
-        });
-      } catch (emailErr) {
-        console.error("Error sending registration email:", emailErr);
-      }
-    })();
+    await sendLeaveEmail(student);
 
     res.status(201).json({
       message: "Leave Application Sent",
@@ -174,5 +161,20 @@ export const UpdateLeaves = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Server error", error: err.message });
+  }
+};
+
+export const sendLeaveEmail = async (student) => {
+  try {
+    const { subject, text, html } = leaveSubmissionTemplate(student.name);
+    await transport.sendMail({
+      from: '"Requesta Portal" <adtshrm1@gmail.com>',
+      to: student.email,
+      subject,
+      text,
+      html,
+    });
+  } catch (err) {
+    console.error("Error sending leave submission email:", err);
   }
 };
