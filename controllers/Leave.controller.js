@@ -46,7 +46,10 @@ export const handleLeaves = async (req, res) => {
     });
 
     await newLeave.save();
-    sendLeaveEmail(student);
+
+    sendLeaveEmail(student).catch((err) => {
+      console.error("Error sending leave email:", err);
+    });
 
     res.status(201).json({
       message: "Leave Application Sent",
