@@ -15,10 +15,13 @@ export const handleLeaves = async (req, res) => {
 
     let supportingDocumentUrl = null;
 
-    if (req.file) {
+    if (req.file && req.file.buffer) {
       const fileType = req.file.mimetype;
 
-      const result = await uploadToCloudinary(req.file.buffer,req.file.originalname);
+      const result = await uploadToCloudinary(
+        req.file.buffer,
+        req.file.originalname
+      );
       supportingDocumentUrl = result.secure_url;
 
       if (
