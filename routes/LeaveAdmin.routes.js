@@ -15,7 +15,7 @@ const router = express.Router();
 router.post(
   "/leave",
   verifyAccessToken1,
-  upload.single("supportingDocument"),
+  upload,
   submitLeaves
 );
 router.get("/getLeave", verifyAccessToken1, getAdminLeaves);

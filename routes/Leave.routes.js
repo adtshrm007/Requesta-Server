@@ -14,7 +14,7 @@ import { upload } from "../middleware/multer.js";
 router.post(
   "/submitLeaves",
   verifyAccessToken,
-  upload.single("supportingDocument"),
+  upload,
   handleLeaves
 );
 router.get("/showLeaves", verifyAccessToken1, getAllLeaves);

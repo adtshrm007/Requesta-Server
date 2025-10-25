@@ -15,29 +15,21 @@ export const handleLeaves = async (req, res) => {
     let supportingDocumentUrl = null;
 
     if (req.file) {
-      const fileType = mime.lookup(req.file.originalname);
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "raw", 
-        folder: "uploads",
-        type: "upload",
-        use_filename: true,
-        unique_filename: false,
-      });
+      const fileType = req.file.mimetype;
 
-      supportingDocumentUrl = result.secure_url;
+      const result = await uploadToCloudinary(req.file.buffer);
+      let supportingDocumentUrl = result.secure_url;
 
       if (
-        fileType === "application/pdf" ||
-        fileType === "application/msword" ||
-        fileType ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        fileType ===
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        [
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ].includes(fileType)
       ) {
         supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
       }
-
-      fs.unlinkSync(req.file.path);
     }
 
     const newLeave = new LeaveModel({
@@ -121,7 +113,7 @@ export const getLeavesForDepartmentalAdmin = async (req, res) => {
 export const UpdateLeaves = async (req, res) => {
   try {
     const { leaveId, status, remark } = req.body;
-    const validStatus = ["approved","forwarded", "rejected", "pending"];
+    const validStatus = ["approved", "forwarded", "rejected", "pending"];
 
     if (!leaveId)
       return res.status(400).json({ message: "Leave ID is required" });
@@ -142,7 +134,7 @@ export const UpdateLeaves = async (req, res) => {
       await AdminRegister.findByIdAndUpdate(req.user.id, {
         $inc: { rejectedLeaveRequests: 1 },
       });
-    } else if (status === "approved"||status==="forwarded") {
+    } else if (status === "approved" || status === "forwarded") {
       await AdminRegister.findByIdAndUpdate(req.user.id, {
         $inc: { acceptedLeaveRequests: 1 },
       });
