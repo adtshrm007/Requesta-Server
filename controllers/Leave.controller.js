@@ -170,13 +170,15 @@ export const UpdateLeaves = async (req, res) => {
 const sendLeaveEmail = async (student) => {
   try {
     const { subject, text, html } = leaveSubmissionTemplate(student.name);
-    await transport.sendMail({
+    const info=await transport.sendMail({
       from: '"Requesta Portal" <adtshrm1@gmail.com>',
       to: student.email,
       subject,
       text,
-      html,
+      html
     });
+    console.log("Email sent: ",info)
+
   } catch (err) {
     console.error("Error sending leave submission email:", err);
   }
