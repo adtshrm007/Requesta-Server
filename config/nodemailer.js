@@ -6,4 +6,6 @@ export const transport = nodemailer.createTransport({
     user: process.env.USER_EMAIL,
     pass: process.env.APP_PASSWORD,
   },
+  logger: true,
+  debug: true,
 });
