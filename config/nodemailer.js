@@ -1,6 +1,6 @@
-import nodemaier from "nodemailer";
+import nodemailer from "nodemailer";
 
-export const transport = nodemaier.createTransport({
+export const transport = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.USER_EMAIL,
