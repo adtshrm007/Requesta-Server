@@ -46,7 +46,7 @@ export const handleLeaves = async (req, res) => {
     });
 
     await newLeave.save();
-    await sendLeaveEmail(student);
+    sendLeaveEmail(student);
 
     res.status(201).json({
       message: "Leave Application Sent",
