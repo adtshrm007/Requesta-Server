@@ -8,6 +8,7 @@ import { leaveUpdateTemplate } from "../templates/LeaveUpdate.template.js";
 import fs from "fs";
 import mime from "mime-types";
 import AdminRegister from "../models/adminRegister.model.js";
+import { uploadToCloudinary } from "../middleware/multer.js";
 export const handleLeaves = async (req, res) => {
   try {
     const student = await studentRegister.findById(req.user.id);
@@ -18,7 +19,7 @@ export const handleLeaves = async (req, res) => {
       const fileType = req.file.mimetype;
 
       const result = await uploadToCloudinary(req.file.buffer);
-      let supportingDocumentUrl = result.secure_url;
+      supportingDocumentUrl = result.secure_url;
 
       if (
         [
