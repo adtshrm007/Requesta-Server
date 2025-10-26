@@ -14,7 +14,7 @@ export const uploadToCloudinary = (fileBuffer, filename = "file") => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: "uploads",
-        resource_type: "auto", // important for PDF/Word/PPT
+        resource_type: "raw", // important for PDF/Word/PPT
         use_filename: true,
         unique_filename: false,
         filename_override: filename, // optional, keeps original file name
