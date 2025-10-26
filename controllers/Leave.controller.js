@@ -24,16 +24,6 @@ export const handleLeaves = async (req, res) => {
       );
       supportingDocumentUrl = result.secure_url;
 
-      if (
-        [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ].includes(fileType)
-      ) {
-        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
-      }
     }
 
     const newLeave = new LeaveModel({
@@ -177,7 +167,7 @@ const sendLeaveEmail = async (student) => {
       text,
       html
     });
-    console.log("Email sent: ",info)
+    console.log("Email sent: ",info);
 
   } catch (err) {
     console.error("Error sending leave submission email:", err);
