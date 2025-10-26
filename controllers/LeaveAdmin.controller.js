@@ -2,6 +2,7 @@ import AdminRegister from "../models/adminRegister.model.js";
 import LeaveAdminModel from "../models/LeaveAdmins.model.js";
 import fs from "fs";
 import mime from "mime-types";
+import { uploadToCloudinary } from "../middleware/multer.js";
 import cloudinary from "../config/cloudinary.js";
 export const submitLeaves = async (req, res) => {
   try {
