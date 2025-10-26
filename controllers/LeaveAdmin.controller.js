@@ -43,8 +43,6 @@ export const submitLeaves = async (req, res) => {
       ) {
         supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
       }
-
-      fs.unlinkSync(req.file.path);
     }
 
     const newLeave = new LeaveAdminModel({
