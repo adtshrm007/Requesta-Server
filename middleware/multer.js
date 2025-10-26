@@ -1,5 +1,5 @@
 import multer from "multer";
-import cloudinary from "../config/cloudinary.js";
+import { v2 as cloudinary } from "cloudinary";
 import streamifier from "streamifier";
 
 // Memory storage keeps the file in RAM
