@@ -22,12 +22,18 @@ export const handleLeaves = async (req, res) => {
         req.file.buffer,
         req.file.originalname
       );
+      supportingDocumentUrl = result.secure_url;
 
-      supportingDocumentUrl = cloudinary.url(result.public_id, {
-        resource_type: "raw",
-        type: "authenticated",
-        sign_url: true, // this creates a temporary URL that works in the browser
-      });
+      if (
+        [
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ].includes(fileType)
+      ) {
+        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
+      }
     }
 
     const newLeave = new LeaveModel({
@@ -164,14 +170,15 @@ export const UpdateLeaves = async (req, res) => {
 const sendLeaveEmail = async (student) => {
   try {
     const { subject, text, html } = leaveSubmissionTemplate(student.name);
-    const info = await transport.sendMail({
+    const info=await transport.sendMail({
       from: '"Requesta Portal" <adtshrm1@gmail.com>',
       to: student.email,
       subject,
       text,
-      html,
+      html
     });
-    console.log("Email sent: ", info);
+    console.log("Email sent: ",info);
+
   } catch (err) {
     console.error("Error sending leave submission email:", err);
   }
