@@ -5,27 +5,32 @@ import express from "express";
 import connectDB from "./config/connectDB.js"; // .js extension required
 import adminRoute from "./routes/Admin.routes.js";
 import studentRoute from "./routes/Student.routes.js";
-import leaveRoute from "./routes/Leave.routes.js"
-import certificateRoute from "./routes/Certificate.routes.js"
-import adminLeaveRoute from "./routes/LeaveAdmin.routes.js"
+import leaveRoute from "./routes/Leave.routes.js";
+import certificateRoute from "./routes/Certificate.routes.js";
+import adminLeaveRoute from "./routes/LeaveAdmin.routes.js";
 
-import cors from "cors"
+import cors from "cors";
 
 const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: ["https://requesta-client.vercel.app/"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use("/api/adminregister", adminRoute);
 app.use("/api/studentregister", studentRoute);
-app.use("/api/leave",leaveRoute);
-app.use("/api/certificate",certificateRoute);
-app.use("/api/adminLeave",adminLeaveRoute);
+app.use("/api/leave", leaveRoute);
+app.use("/api/certificate", certificateRoute);
+app.use("/api/adminLeave", adminLeaveRoute);
 
-
-
-app.get('/', (req, res) => {
-  res.send('Hello');
+app.get("/", (req, res) => {
+  res.send("Hello");
 });
 
 connectDB().then(() => {
