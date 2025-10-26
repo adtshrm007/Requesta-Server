@@ -4,6 +4,7 @@ import cloudinary from "../config/cloudinary.js";
 import { transport } from "../config/nodemailer.js";
 import { certificateSubmissionTemplate } from "../templates/CertificateSubmission.template.js";
 import { certificateUpdateTemplate } from "../templates/CertificateUpdate.template.js";
+import { uploadToCloudinary } from "../middleware/multer.js";
 import fs from "fs";
 import mime from "mime-types";
 import AdminRegister from "../models/adminRegister.model.js";
@@ -14,14 +15,13 @@ export const handleCertificateRequests = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
     let supportingDocumentUrl = null;
-    if (req.file) {
-      const fileType = mime.lookup(req.file.originalname);
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "raw",
-        folder: "uploads",
-        use_filename: true,
-        unique_filename: false,
-      });
+    if (req.file && req.file.buffer) {
+      const fileType = req.file.mimetype;
+
+      const result = await uploadToCloudinary(
+        req.file.buffer,
+        req.file.originalname
+      );
       supportingDocumentUrl = result.secure_url;
 
       if (
@@ -94,16 +94,14 @@ export const UpdateCertificates = async (req, res) => {
       return res.status(400).json({ message: "Invalid status value" });
     let addCertificateURL = null;
 
-    if (req.file) {
-      const fileType = mime.lookup(req.file.originalname);
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "raw",
-        folder: "uploads",
-        type: "upload",
-        use_filename: true,
-        unique_filename: false,
-      });
+    if (req.file && req.file.buffer) {
+      const fileType = req.file.mimetype;
 
+      const result = await uploadToCloudinary(
+        req.file.buffer,
+        req.file.originalname
+      );
+ss
       addCertificateURL = result.secure_url;
 
       if (

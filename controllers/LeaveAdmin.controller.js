@@ -11,27 +11,25 @@ export const submitLeaves = async (req, res) => {
       return res.status(404).json({ message: "Admin not found" });
     }
 
-    if(admin.medicalLeaveLeft<=0 && req.body.type==="Medical Leave"){
+    if (admin.medicalLeaveLeft <= 0 && req.body.type === "Medical Leave") {
       return res.status(400).json({ message: "No Medical Leaves Left" });
     }
-    if(admin.officialLeaveLeft<=0 && req.body.type==="Official Leave"){
+    if (admin.officialLeaveLeft <= 0 && req.body.type === "Official Leave") {
       return res.status(400).json({ message: "No Official Leaves Left" });
     }
-    if(admin.casualLeaveLeft<=0 && req.body.type==="Casual Leave"){
+    if (admin.casualLeaveLeft <= 0 && req.body.type === "Casual Leave") {
       return res.status(400).json({ message: "No Casual Leaves Left" });
     }
-    
+
     let supportingDocumentUrl = null;
 
-    if (req.file) {
-      const fileType = mime.lookup(req.file.originalname);
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        resource_type: "raw",
-        folder: "uploads",
-        type: "upload",
-        use_filename: true,
-        unique_filename: false,
-      });
+    if (req.file && req.file.buffer) {
+      const fileType = req.file.mimetype;
+
+      const result = await uploadToCloudinary(
+        req.file.buffer,
+        req.file.originalname
+      );
 
       supportingDocumentUrl = result.secure_url;
 
@@ -58,8 +56,6 @@ export const submitLeaves = async (req, res) => {
       fromDate: req.body.fromDate,
       toDate: req.body.toDate,
     });
-
-    
 
     await newLeave.save();
     return res.status(200).json({
@@ -120,7 +116,7 @@ export const showFacultyLeave = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-export const showDepartemntalAdminLeave=async(req,res)=>{
+export const showDepartemntalAdminLeave = async (req, res) => {
   try {
     const adminDepartment = req.user.department;
 
@@ -140,14 +136,12 @@ export const showDepartemntalAdminLeave=async(req,res)=>{
     console.error(err);
     return res.status(500).json({ message: "Server error" });
   }
-}
-
-
+};
 
 export const UpdateLeaves = async (req, res) => {
   try {
     const { leaveId, status, remark } = req.body;
-    const validStatus = ["approved","forwarded", "rejected", "pending"];
+    const validStatus = ["approved", "forwarded", "rejected", "pending"];
 
     if (!leaveId)
       return res.status(400).json({ message: "Leave ID is required" });
@@ -161,13 +155,15 @@ export const UpdateLeaves = async (req, res) => {
 
     const updateStatus = await LeaveAdminModel.findByIdAndUpdate(
       leaveId,
-      { status, remark},
+      { status, remark },
       { new: true }
     ).populate("admin");
 
     const applicant = updateStatus.admin;
     if (!applicant) {
-      return res.status(404).json({ success: false, message: "Applicant not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Applicant not found" });
     }
     if (status === "rejected") {
       await AdminRegister.findByIdAndUpdate(applicant._id, {
@@ -175,48 +171,48 @@ export const UpdateLeaves = async (req, res) => {
       });
     } else if (status === "approved") {
       if (updateStatus.type === "Official Leave") {
-      await AdminRegister.findByIdAndUpdate(applicant._id, {
-        $inc: {
-          totalLeaves: -1,
-          totalLeavesLeft: -1,
-          totalLeavesTaken: 1,
-          officialLeave: -1,
-          officialLeaveLeft: -1,
-          officialLeaveTaken: 1,
-        },
-      });
-    }
-    if (updateStatus.type === "Medical Leave") {
-      await AdminRegister.findByIdAndUpdate(applicant._id, {
-        $inc: {
-          totalLeaves: -1,
-          totalLeavesLeft: -1,
-          totalLeavesTaken: 1,
-          medicalLeave: -1,
-          medicalLeaveLeft: -1,
-          medicalLeaveTaken: 1,
-        },
-      });
-    }
-    if (updateStatus.type === "Casual Leave") {
-      await AdminRegister.findByIdAndUpdate(applicant.id, {
-        $inc: {
-          totalLeaves: -1,
-          totalLeavesLeft: -1,
-          totalLeavesTaken: 1,
-          casualLeave: -1,
-          casualLeaveLeft: -1,
-          casualLeaveTaken: 1,
-        },
-      });
-    }
+        await AdminRegister.findByIdAndUpdate(applicant._id, {
+          $inc: {
+            totalLeaves: -1,
+            totalLeavesLeft: -1,
+            totalLeavesTaken: 1,
+            officialLeave: -1,
+            officialLeaveLeft: -1,
+            officialLeaveTaken: 1,
+          },
+        });
+      }
+      if (updateStatus.type === "Medical Leave") {
+        await AdminRegister.findByIdAndUpdate(applicant._id, {
+          $inc: {
+            totalLeaves: -1,
+            totalLeavesLeft: -1,
+            totalLeavesTaken: 1,
+            medicalLeave: -1,
+            medicalLeaveLeft: -1,
+            medicalLeaveTaken: 1,
+          },
+        });
+      }
+      if (updateStatus.type === "Casual Leave") {
+        await AdminRegister.findByIdAndUpdate(applicant.id, {
+          $inc: {
+            totalLeaves: -1,
+            totalLeavesLeft: -1,
+            totalLeavesTaken: 1,
+            casualLeave: -1,
+            casualLeaveLeft: -1,
+            casualLeaveTaken: 1,
+          },
+        });
+      }
     }
     (async () => {
       try {
         const { subject, text, html } = leaveUpdateTemplate(
           updateStatus.admin.name,
           updateStatus.type,
-          updateStatus.status,
+          updateStatus.status
         );
         await transport.sendMail({
           from: '"Requesta  Portal" <adtshrm1@gmail.com>',
