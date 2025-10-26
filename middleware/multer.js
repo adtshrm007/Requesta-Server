@@ -18,8 +18,7 @@ export const uploadToCloudinary = (fileBuffer, filename = "file") => {
         use_filename: true,
         unique_filename: false,
         filename_override: filename, // optional, keeps original file name
-        type:"upload",
-        format:"jpg"
+        type:"upload"
       },
       (err, result) => {
         if (err) return reject(err);
