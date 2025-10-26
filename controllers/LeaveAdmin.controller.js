@@ -34,16 +34,6 @@ export const submitLeaves = async (req, res) => {
 
       supportingDocumentUrl = result.secure_url;
 
-      if (
-        fileType === "application/pdf" ||
-        fileType === "application/msword" ||
-        fileType ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        fileType ===
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-      ) {
-        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
-      }
     }
 
     const newLeave = new LeaveAdminModel({

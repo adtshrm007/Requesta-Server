@@ -24,16 +24,7 @@ export const handleLeaves = async (req, res) => {
       );
       supportingDocumentUrl = result.secure_url;
 
-      if (
-        [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ].includes(fileType)
-      ) {
-        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
-      }
+
     }
 
     const newLeave = new LeaveModel({
@@ -45,8 +36,13 @@ export const handleLeaves = async (req, res) => {
       supportingDocument: supportingDocumentUrl,
     });
 
+    console.log(newLeave.supportingDocument)
+
     await newLeave.save();
-    await sendLeaveEmail(student);
+
+    sendLeaveEmail(student).catch((err) => {
+      console.error("Error sending leave email:", err);
+    });
 
     res.status(201).json({
       message: "Leave Application Sent",
@@ -167,14 +163,15 @@ export const UpdateLeaves = async (req, res) => {
 const sendLeaveEmail = async (student) => {
   try {
     const { subject, text, html } = leaveSubmissionTemplate(student.name);
-    const info = await transport.sendMail({
+    const info=await transport.sendMail({
       from: '"Requesta Portal" <adtshrm1@gmail.com>',
       to: student.email,
       subject,
       text,
-      html,
+      html
     });
-    console.log("Email sent: ", info);
+    console.log("Email sent: ",info);
+
   } catch (err) {
     console.error("Error sending leave submission email:", err);
   }

@@ -23,18 +23,6 @@ export const handleCertificateRequests = async (req, res) => {
         req.file.originalname
       );
       supportingDocumentUrl = result.secure_url;
-
-      if (
-        fileType === "application/pdf" ||
-        fileType === "application/msword" ||
-        fileType ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        fileType ===
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-      ) {
-        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
-      }
-
     }
     const newCertificate = new Certificate({
       student: student._id,
@@ -100,21 +88,7 @@ export const UpdateCertificates = async (req, res) => {
         req.file.buffer,
         req.file.originalname
       );
-ss
       addCertificateURL = result.secure_url;
-
-      if (
-        fileType === "application/pdf" ||
-        fileType === "application/msword" ||
-        fileType ===
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        fileType ===
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-      ) {
-        addCertificateURL = `https://docs.google.com/gview?url=${addCertificateURL}&embedded=true`;
-      }
-
-      fs.unlinkSync(req.file.path);
     }
 
     const admin = await AdminRegister.findById(req.user.id);
