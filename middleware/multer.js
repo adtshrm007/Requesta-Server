@@ -4,7 +4,7 @@ import streamifier from "streamifier";
 
 // Memory storage keeps the file in RAM
 const storage = multer.memoryStorage();
-export const upload = multer({ storage }).single("supportingDocument");
+export const upload = multer({ storage });
 
 // Upload buffer to Cloudinary
 export const uploadToCloudinary = (fileBuffer, filename = "file") => {
