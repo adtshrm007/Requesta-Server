@@ -32,15 +32,7 @@ export const handleLeaves = async (req, res) => {
           "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         ].includes(fileType)
       ) {
-        const fileId = result.public_id; // e.g. uploads/College_ID_card
-        const cloudName = "dp7c4q6ud";
-        const format = result.format || "pdf";
-
-        const inlineUrl = `https://res.cloudinary.com/${cloudName}/raw/upload/fl_attachment:false/${fileId}.pdf`;
-
-        supportingDocumentUrl = `https://docs.google.com/gview?url=${encodeURIComponent(
-          inlineUrl
-        )}&embedded=true`;
+        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
       }
     }
 
@@ -54,10 +46,7 @@ export const handleLeaves = async (req, res) => {
     });
 
     await newLeave.save();
-
-    sendLeaveEmail(student).catch((err) => {
-      console.error("Error sending leave email:", err);
-    });
+    await sendLeaveEmail(student);
 
     res.status(201).json({
       message: "Leave Application Sent",
@@ -178,14 +167,15 @@ export const UpdateLeaves = async (req, res) => {
 const sendLeaveEmail = async (student) => {
   try {
     const { subject, text, html } = leaveSubmissionTemplate(student.name);
-    const info = await transport.sendMail({
+    const info=await transport.sendMail({
       from: '"Requesta Portal" <adtshrm1@gmail.com>',
       to: student.email,
       subject,
       text,
-      html,
+      html
     });
-    console.log("Email sent: ", info);
+    console.log("Email sent: ",info);
+
   } catch (err) {
     console.error("Error sending leave submission email:", err);
   }
