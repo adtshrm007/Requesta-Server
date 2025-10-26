@@ -24,16 +24,7 @@ export const handleLeaves = async (req, res) => {
       );
       supportingDocumentUrl = result.secure_url;
 
-      if (
-        [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ].includes(fileType)
-      ) {
-        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
-      }
+  
     }
 
     const newLeave = new LeaveModel({
