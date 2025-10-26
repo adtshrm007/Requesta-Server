@@ -32,7 +32,7 @@ export const handleLeaves = async (req, res) => {
           "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         ].includes(fileType)
       ) {
-        supportingDocumentUrl = `https://docs.google.com/gview?url=${supportingDocumentUrl}&embedded=true`;
+        supportingDocumentUrl = `https://docs.google.com/gview?url=${encodeURIComponent(supportingDocumentUrl)}&embedded=true`;
       }
     }
 
