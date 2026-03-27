@@ -26,6 +26,7 @@ export const handleCertificateRequests = async (req, res) => {
       CertificateType: req.body.CertificateType,
       supportingDocument: supportingDocumentUrl,
       currentHandlerRole: "SUPER_ADMIN",
+      createdBy: student._id,
       createdByRole: "STUDENT",
     });
 
@@ -95,8 +96,11 @@ export const UpdateCertificates = async (req, res) => {
     if (!certId) return res.status(400).json({ message: "Certificate ID is required" });
     if (!status) return res.status(400).json({ message: "Status is required" });
 
+    const cert = await Certificate.findById(certId);
+    if (!cert) return res.status(404).json({ message: "Certificate not found" });
+
     // RBAC: only Super Admin can act
-    const { allowed, reason } = canActOnCertificate(actorRole);
+    const { allowed, reason } = canActOnCertificate(actorRole, cert.status);
     if (!allowed) {
       return res.status(403).json({ message: reason });
     }

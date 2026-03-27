@@ -43,6 +43,7 @@ export const submitLeaves = async (req, res) => {
       fromDate: req.body.fromDate,
       toDate: req.body.toDate,
       currentHandlerRole: handlerRole,
+      createdBy: admin._id,
       createdByRole: admin.role,
     });
 
@@ -99,8 +100,8 @@ export const showFacultyLeave = async (req, res) => {
     const adminDepartment = req.user.department;
     if (!adminDepartment) return res.status(404).json({ message: "Admin not found" });
 
-    // Dept Admin sees faculty leaves assigned to them
-    const leaves = await LeaveAdminModel.find({ currentHandlerRole: "DEPT_ADMIN" })
+    // Dept Admin sees ALL faculty leaves assigned to their department
+    const leaves = await LeaveAdminModel.find()
       .populate({
         path: "admin",
         match: { role: "Faculty", department: adminDepartment },

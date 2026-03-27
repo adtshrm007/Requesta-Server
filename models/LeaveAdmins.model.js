@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 const LeaveAdminSchema = new mongoose.Schema(
   {
+    requestType: { type: String, default: "LEAVE" },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "AdminRegister" },
     admin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AdminRegister",
@@ -38,6 +40,10 @@ const LeaveAdminSchema = new mongoose.Schema(
       default: null,
     },
     remark: {
+      type: String,
+      default: null,
+    },
+    remarks: {
       type: String,
       default: null,
     },

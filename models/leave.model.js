@@ -2,6 +2,8 @@ import mongoose, { Schema } from "mongoose";
 
 const LeaveModelSchema = new Schema(
   {
+    type: { type: String, default: "LEAVE" },
+    createdBy: { type: Schema.Types.ObjectId, ref: "studentRegister" },
     studentId: {
       type: Schema.Types.ObjectId,
       ref: "studentRegister",
@@ -21,7 +23,7 @@ const LeaveModelSchema = new Schema(
     },
     currentHandlerRole: {
       type: String,
-      enum: ["FACULTY", "DEPT_ADMIN"],
+      enum: ["FACULTY", "DEPT_ADMIN", "SUPER_ADMIN"],
       default: "FACULTY",
     },
     createdByRole: {
@@ -35,6 +37,10 @@ const LeaveModelSchema = new Schema(
     remark: {
       type: String,
       required: false,
+      default: "No Remarks",
+    },
+    remarks: {
+      type: String,
       default: "No Remarks",
     },
     approvedBy: {

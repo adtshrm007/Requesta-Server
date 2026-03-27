@@ -41,8 +41,8 @@ export function canActOnStudentLeave(actorRole, targetStatus, currentStatus) {
     if (!["approved", "rejected"].includes(targetStatus)) {
       return { allowed: false, reason: "Departmental Admin can only approve or reject student leave requests." };
     }
-    if (currentStatus !== "forwarded") {
-      return { allowed: false, reason: "Departmental Admin can only act on leaves forwarded by Faculty." };
+    if (!["pending", "forwarded"].includes(currentStatus)) {
+      return { allowed: false, reason: "Departmental Admin can only act on pending or forwarded leaves." };
     }
     return { allowed: true };
   }
@@ -100,12 +100,15 @@ export function canActOnAdminLeave(actorRole, submitterRole, targetStatus, curre
  * Only Super Admin can approve/reject certificates.
  * @param {string} actorRole
  */
-export function canActOnCertificate(actorRole) {
+export function canActOnCertificate(actorRole, currentStatus) {
   if (actorRole !== "Super Admin") {
     return {
       allowed: false,
       reason: "Only Super Admin can approve or reject certificate requests.",
     };
+  }
+  if (currentStatus !== "pending") {
+    return { allowed: false, reason: "This certificate has already been processed." };
   }
   return { allowed: true };
 }

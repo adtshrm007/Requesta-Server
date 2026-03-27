@@ -41,6 +41,7 @@ export const handleLeaves = async (req, res) => {
       Reason: req.body.Reason,
       supportingDocument: supportingDocumentUrl,
       currentHandlerRole: "FACULTY",
+      createdBy: student._id,
       createdByRole: "STUDENT",
     });
 
@@ -90,7 +91,8 @@ export const getAllLeaves = async (req, res) => {
 export const getLeavesForDepartmentalAdmin = async (req, res) => {
   try {
     const dept = req.user.department;
-    const leaves = await LeaveModel.find({ currentHandlerRole: "DEPT_ADMIN" })
+    // Dept Admin sees ALL student leaves assigned to their department
+    const leaves = await LeaveModel.find()
       .populate({ path: "studentId", match: { branch: dept } })
       .sort({ createdAt: -1 })
       .then((leaves) => leaves.filter((leave) => leave.studentId !== null));

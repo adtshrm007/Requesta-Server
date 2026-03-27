@@ -2,6 +2,8 @@ import mongoose, { Schema } from "mongoose";
 
 const CertificateModel = new Schema(
   {
+    type: { type: String, default: "CERTIFICATE" },
+    createdBy: { type: Schema.Types.ObjectId, ref: "studentRegister" },
     student: {
       type: Schema.Types.ObjectId,
       ref: "studentRegister",
@@ -34,6 +36,10 @@ const CertificateModel = new Schema(
       required: false,
     },
     remark: {
+      type: String,
+      default: "No Remarks",
+    },
+    remarks: {
       type: String,
       default: "No Remarks",
     },
