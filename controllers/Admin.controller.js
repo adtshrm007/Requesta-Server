@@ -316,6 +316,10 @@ export const getDashboardStats = async (req, res) => {
       let approvedLeaves = 0;
       let rejectedLeaves = 0;
       
+      let totalFacultyLeaves = facultyLeaves.length;
+      let approvedFacultyLeaves = 0;
+      let rejectedFacultyLeaves = 0;
+      
       studentLeaves.forEach(l => {
         if (l.status === "approved") approvedLeaves++;
         else if (l.status === "rejected") rejectedLeaves++;
@@ -324,8 +328,8 @@ export const getDashboardStats = async (req, res) => {
       });
       
       facultyLeaves.forEach(l => {
-        if (l.status === "approved") approvedLeaves++;
-        else if (l.status === "rejected") rejectedLeaves++;
+        if (l.status === "approved") { approvedLeaves++; approvedFacultyLeaves++; }
+        else if (l.status === "rejected") { rejectedLeaves++; rejectedFacultyLeaves++; }
         else pendingLeaves++;
       });
       
@@ -334,7 +338,10 @@ export const getDashboardStats = async (req, res) => {
         pendingLeaves,
         forwardedLeaves,
         approvedLeaves,
-        rejectedLeaves
+        rejectedLeaves,
+        totalFacultyLeaves,
+        approvedFacultyLeaves,
+        rejectedFacultyLeaves
       });
     }
     
@@ -343,11 +350,20 @@ export const getDashboardStats = async (req, res) => {
       const deptAdminLeaves = await LeaveAdminModel.find()
         .populate({ path: "admin", match: { role: "Departmental Admin" } })
         .then(docs => docs.filter(d => d.admin !== null));
+      const studentLeaves = await LeaveModel.find({ createdByRole: "STUDENT" });
+      const facultyLeaves = await LeaveAdminModel.find()
+        .populate({ path: "admin", match: { role: "Faculty" } })
+        .then(docs => docs.filter(d => d.admin !== null));
         
       let totalRequests = certificates.length + deptAdminLeaves.length;
       let pendingRequests = 0;
       let approvedRequests = 0;
       let rejectedRequests = 0;
+
+      let totalStudentLeaves = studentLeaves.length;
+      let totalFacultyLeaves = facultyLeaves.length;
+      let totalDeptAdminLeaves = deptAdminLeaves.length;
+      let totalCertificateRequests = certificates.length;
       
       certificates.forEach(c => {
         if (c.status === "approved") approvedRequests++;
@@ -365,7 +381,11 @@ export const getDashboardStats = async (req, res) => {
         totalRequests,
         pendingRequests,
         approvedRequests,
-        rejectedRequests
+        rejectedRequests,
+        totalStudentLeaves,
+        totalFacultyLeaves,
+        totalDeptAdminLeaves,
+        totalCertificateRequests
       });
     }
     
