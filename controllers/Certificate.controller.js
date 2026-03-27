@@ -75,9 +75,9 @@ export const getAllCertificates = async (req, res) => {
       return res.status(403).json({ message: reason });
     }
 
-    const dept = req.user.department;
+    // Super Admins oversee all departments, so no strict branch match is required
     const certificates = await Certificate.find()
-      .populate({ path: "student", match: { branch: dept } })
+      .populate("student")
       .sort({ createdAt: -1 })
       .then((certs) => certs.filter((cert) => cert.student !== null));
 
@@ -126,6 +126,7 @@ export const UpdateCertificates = async (req, res) => {
         remark,
         addCertificate: addCertificateURL,
         approvedBy: actorRole,
+        currentHandlerRole: null // clear handler queue
       },
       { new: true }
     ).populate("student");

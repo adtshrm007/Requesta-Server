@@ -106,10 +106,10 @@ export const getLeavesForDepartmentalAdmin = async (req, res) => {
 // ── Get ALL leaves for Super Admin to VIEW (read-only) ────────────────────────
 export const getLeavesForSuperAdmin = async (req, res) => {
   try {
-    const dept = req.user.department;
     // Super Admin can VIEW all leaves (all statuses) but cannot act on them
+    // Removed branch: dept match because Super Admins do not belong to a specific branch for global views
     const leaves = await LeaveModel.find()
-      .populate({ path: "studentId", match: { branch: dept } })
+      .populate("studentId")
       .sort({ createdAt: -1 })
       .then((leaves) => leaves.filter((leave) => leave.studentId !== null));
     return res.json(leaves);
@@ -141,6 +141,8 @@ export const UpdateLeaves = async (req, res) => {
     let nextHandlerRole = leave.currentHandlerRole;
     if (status === "forwarded") {
       nextHandlerRole = "DEPT_ADMIN";
+    } else if (status === "approved" || status === "rejected") {
+      nextHandlerRole = null; // Clears the handler queue
     }
 
     // Update the leave

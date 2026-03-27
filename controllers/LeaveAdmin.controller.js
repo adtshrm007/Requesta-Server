@@ -119,14 +119,11 @@ export const showFacultyLeave = async (req, res) => {
 // ── Show Departmental Admin Leaves (for Super Admin) ─────────────────────────
 export const showDepartemntalAdminLeave = async (req, res) => {
   try {
-    const adminDepartment = req.user.department;
-    if (!adminDepartment) return res.status(404).json({ message: "Admin not found" });
-
-    // Super Admin sees Dept Admin leaves assigned to them
+    // Super Admin oversees all departments, so no strict department match is required
     const leaves = await LeaveAdminModel.find({ currentHandlerRole: "SUPER_ADMIN" })
       .populate({
         path: "admin",
-        match: { role: "Departmental Admin", department: adminDepartment },
+        match: { role: "Departmental Admin" },
       })
       .sort({ createdAt: -1 })
       .then((leaves) => leaves.filter((leave) => leave.admin !== null));
@@ -159,7 +156,12 @@ export const UpdateLeaves = async (req, res) => {
 
     const updateStatus = await LeaveAdminModel.findByIdAndUpdate(
       leaveId,
-      { status, remark: remark || leave.remark, approvedBy: actorRole },
+      { 
+        status, 
+        remark: remark || leave.remark, 
+        approvedBy: actorRole,
+        currentHandlerRole: null // Clear handler queue 
+      },
       { new: true }
     ).populate("admin");
 
