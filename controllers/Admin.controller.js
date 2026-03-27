@@ -1,6 +1,6 @@
 import AdminRegister from "../models/adminRegister.model.js";
 import LeaveModel from "../models/leave.model.js";
-import LeaveAdminModel from "../models/adminLeave.model.js";
+import LeaveAdminModel from "../models/LeaveAdmins.model.js";
 import Student from "../models/studentRegister.model.js";
 import { transport } from "../config/nodemailer.js";
 import { registrationAdminTemplate } from "../templates/RegistrationAdmin.template.js";
