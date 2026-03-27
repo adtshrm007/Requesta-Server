@@ -23,6 +23,20 @@ const LeaveAdminSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+    currentHandlerRole: {
+      type: String,
+      enum: ["DEPT_ADMIN", "SUPER_ADMIN"],
+      default: "DEPT_ADMIN",
+    },
+    createdByRole: {
+      type: String,
+      enum: ["Faculty", "Departmental Admin"],
+      default: "Faculty",
+    },
+    approvedBy: {
+      type: String,
+      default: null,
+    },
     remark: {
       type: String,
       default: null,

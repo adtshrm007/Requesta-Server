@@ -17,8 +17,17 @@ const CertificateModel = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "forwarded", "accepted", "rejected"],
+      enum: ["pending", "approved", "rejected"],
       default: "pending",
+    },
+    currentHandlerRole: {
+      type: String,
+      enum: ["SUPER_ADMIN"],
+      default: "SUPER_ADMIN",
+    },
+    createdByRole: {
+      type: String,
+      default: "STUDENT",
     },
     supportingDocument: {
       type: String,

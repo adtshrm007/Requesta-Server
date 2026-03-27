@@ -1,17 +1,18 @@
 import AdminRegister from "../models/adminRegister.model.js";
 import LeaveAdminModel from "../models/LeaveAdmins.model.js";
-import fs from "fs";
-import mime from "mime-types";
 import { uploadToCloudinary } from "../middleware/multer.js";
-import cloudinary from "../config/cloudinary.js";
+import { canActOnAdminLeave } from "../services/workflow.service.js";
+import { createLog, getLogsForRequest } from "../services/auditLog.service.js";
+import { leaveUpdateTemplate } from "../templates/LeaveUpdate.template.js";
+import { transport } from "../config/nodemailer.js";
+
+// ── Submit Leave (Admin: Faculty or Departmental Admin) ───────────────────────
 export const submitLeaves = async (req, res) => {
   try {
     const admin = await AdminRegister.findById(req.user.id);
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
 
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
-    }
-
+    // Balance checks
     if (admin.medicalLeaveLeft <= 0 && req.body.type === "Medical Leave") {
       return res.status(400).json({ message: "No Medical Leaves Left" });
     }
@@ -22,18 +23,15 @@ export const submitLeaves = async (req, res) => {
       return res.status(400).json({ message: "No Casual Leaves Left" });
     }
 
+    // Determine handler based on submitter role
+    // Faculty leave → Departmental Admin handles it
+    // Departmental Admin leave → Super Admin handles it
+    const handlerRole = admin.role === "Faculty" ? "DEPT_ADMIN" : "SUPER_ADMIN";
+
     let supportingDocumentUrl = null;
-
     if (req.file && req.file.buffer) {
-      const fileType = req.file.mimetype;
-
-      const result = await uploadToCloudinary(
-        req.file.buffer,
-        req.file.originalname
-      );
-
+      const result = await uploadToCloudinary(req.file.buffer, req.file.originalname);
       supportingDocumentUrl = result.secure_url;
-
     }
 
     const newLeave = new LeaveAdminModel({
@@ -44,188 +42,205 @@ export const submitLeaves = async (req, res) => {
       reason: req.body.reason,
       fromDate: req.body.fromDate,
       toDate: req.body.toDate,
+      currentHandlerRole: handlerRole,
+      createdByRole: admin.role,
     });
 
     await newLeave.save();
+
+    // Audit log
+    createLog({
+      requestId: newLeave._id,
+      requestType: "ADMIN_LEAVE",
+      action: "REQUEST_CREATED",
+      performedBy: admin._id,
+      performedByName: admin.name,
+      role: admin.role,
+      remarks: `${req.body.type} leave application submitted`,
+    });
+
     return res.status(200).json({
       message: "Leave application submitted successfully",
       data: newLeave,
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+// ── Get own leaves (for the logged-in admin) ──────────────────────────────────
 export const getAdminLeaves = async (req, res) => {
   try {
     const leave = await LeaveAdminModel.find({ admin: req.user.id })
       .populate({ path: "admin" })
       .sort({ createdAt: -1 });
-    if (!leave) {
-      return res.status(404).json({ message: "No leave application found" });
-    }
-    return res.status(200).json({ data: leave });
+    return res.status(200).json({ data: leave || [] });
   } catch (err) {
     return res.status(500).json({ message: "Server error" });
   }
 };
 
+// ── Get ALL admin leaves (Super Admin sees everything) ────────────────────────
 export const getAllAdminLeaves = async (req, res) => {
   try {
-    const leave = await LeaveAdminModel.find(req.user.id)
+    const leave = await LeaveAdminModel.find()
       .populate({ path: "admin" })
       .sort({ createdAt: -1 });
-    if (!leave) {
-      return res.status(404).json({ message: "No leave application found" });
-    }
-    return res.status(200).json({ data: leave });
+    return res.status(200).json({ data: leave || [] });
   } catch (err) {
     return res.status(500).json({ message: "Server error" });
   }
 };
 
+// ── Show Faculty Leaves (for Departmental Admin — leaves where it's their turn) ─
 export const showFacultyLeave = async (req, res) => {
   try {
     const adminDepartment = req.user.department;
+    if (!adminDepartment) return res.status(404).json({ message: "Admin not found" });
 
-    if (!adminDepartment) {
-      return res.status(404).json({ message: "Admin not found" });
-    }
-
-    const leaves = await LeaveAdminModel.find()
+    // Dept Admin sees faculty leaves assigned to them
+    const leaves = await LeaveAdminModel.find({ currentHandlerRole: "DEPT_ADMIN" })
       .populate({
         path: "admin",
         match: { role: "Faculty", department: adminDepartment },
       })
+      .sort({ createdAt: -1 })
       .then((leaves) => leaves.filter((leave) => leave.admin !== null));
 
-    res.json(leaves);
+    return res.json(leaves);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+// ── Show Departmental Admin Leaves (for Super Admin) ─────────────────────────
 export const showDepartemntalAdminLeave = async (req, res) => {
   try {
     const adminDepartment = req.user.department;
+    if (!adminDepartment) return res.status(404).json({ message: "Admin not found" });
 
-    if (!adminDepartment) {
-      return res.status(404).json({ message: "Admin not found" });
-    }
-
-    const leaves = await LeaveAdminModel.find()
+    // Super Admin sees Dept Admin leaves assigned to them
+    const leaves = await LeaveAdminModel.find({ currentHandlerRole: "SUPER_ADMIN" })
       .populate({
         path: "admin",
         match: { role: "Departmental Admin", department: adminDepartment },
       })
+      .sort({ createdAt: -1 })
       .then((leaves) => leaves.filter((leave) => leave.admin !== null));
 
-    res.json(leaves);
+    return res.json(leaves);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Server error" });
   }
 };
 
+// ── Update Admin Leave Status (RBAC enforced) ─────────────────────────────────
 export const UpdateLeaves = async (req, res) => {
   try {
     const { leaveId, status, remark } = req.body;
-    const validStatus = ["approved", "forwarded", "rejected", "pending"];
+    const actorRole = req.user.role;
 
-    if (!leaveId)
-      return res.status(400).json({ message: "Leave ID is required" });
-    if (!validStatus.includes(status))
-      return res.status(400).json({ message: "Invalid status value" });
+    if (!leaveId) return res.status(400).json({ message: "Leave ID is required" });
+    if (!status) return res.status(400).json({ message: "Status is required" });
 
-    const admin = await AdminRegister.findById(req.user.id);
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
+    const leave = await LeaveAdminModel.findById(leaveId).populate("admin");
+    if (!leave) return res.status(404).json({ message: "Leave not found" });
+
+    // ── STRICT WORKFLOW CHECK ───────────────────────────────────────────────
+    const submitterRole = leave.admin?.role;
+    const { allowed, reason } = canActOnAdminLeave(actorRole, submitterRole, status, leave.status);
+    if (!allowed) {
+      return res.status(403).json({ message: reason });
     }
 
     const updateStatus = await LeaveAdminModel.findByIdAndUpdate(
       leaveId,
-      { status, remark },
+      { status, remark: remark || leave.remark, approvedBy: actorRole },
       { new: true }
     ).populate("admin");
 
     const applicant = updateStatus.admin;
-    if (!applicant) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Applicant not found" });
-    }
-    if (status === "rejected") {
-      await AdminRegister.findByIdAndUpdate(applicant._id, {
-        $inc: { rejectedLeaveRequests: 1 },
-      });
-    } else if (status === "approved") {
+    if (!applicant) return res.status(404).json({ message: "Applicant not found" });
+
+    // Audit log
+    const action = status === "approved" ? "REQUEST_APPROVED" : "REQUEST_REJECTED";
+    createLog({
+      requestId: leaveId,
+      requestType: "ADMIN_LEAVE",
+      action,
+      performedBy: req.user.id,
+      performedByName: req.user.name,
+      role: actorRole,
+      remarks: remark || null,
+    });
+
+    // Update leave balances on approval
+    if (status === "approved") {
+      const balanceUpdate = {
+        $inc: {
+          totalLeaves: -1,
+          totalLeavesLeft: -1,
+          totalLeavesTaken: 1,
+        },
+      };
+
       if (updateStatus.type === "Official Leave") {
-        await AdminRegister.findByIdAndUpdate(applicant._id, {
-          $inc: {
-            totalLeaves: -1,
-            totalLeavesLeft: -1,
-            totalLeavesTaken: 1,
-            officialLeave: -1,
-            officialLeaveLeft: -1,
-            officialLeaveTaken: 1,
-          },
-        });
+        balanceUpdate.$inc.officialLeave = -1;
+        balanceUpdate.$inc.officialLeaveLeft = -1;
+        balanceUpdate.$inc.officialLeaveTaken = 1;
+      } else if (updateStatus.type === "Medical Leave") {
+        balanceUpdate.$inc.medicalLeave = -1;
+        balanceUpdate.$inc.medicalLeaveLeft = -1;
+        balanceUpdate.$inc.medicalLeaveTaken = 1;
+      } else if (updateStatus.type === "Casual Leave") {
+        balanceUpdate.$inc.casualLeave = -1;
+        balanceUpdate.$inc.casualLeaveLeft = -1;
+        balanceUpdate.$inc.casualLeaveTaken = 1;
       }
-      if (updateStatus.type === "Medical Leave") {
-        await AdminRegister.findByIdAndUpdate(applicant._id, {
-          $inc: {
-            totalLeaves: -1,
-            totalLeavesLeft: -1,
-            totalLeavesTaken: 1,
-            medicalLeave: -1,
-            medicalLeaveLeft: -1,
-            medicalLeaveTaken: 1,
-          },
-        });
-      }
-      if (updateStatus.type === "Casual Leave") {
-        await AdminRegister.findByIdAndUpdate(applicant.id, {
-          $inc: {
-            totalLeaves: -1,
-            totalLeavesLeft: -1,
-            totalLeavesTaken: 1,
-            casualLeave: -1,
-            casualLeaveLeft: -1,
-            casualLeaveTaken: 1,
-          },
-        });
-      }
+
+      await AdminRegister.findByIdAndUpdate(applicant._id, balanceUpdate);
+    } else if (status === "rejected") {
+      await AdminRegister.findByIdAndUpdate(applicant._id, { $inc: { rejectedLeaveRequests: 1 } });
     }
-    (async () => {
-      try {
-        const { subject, text, html } = leaveUpdateTemplate(
-          updateStatus.admin.name,
-          updateStatus.type,
-          updateStatus.status
-        );
-        await transport.sendMail({
-          from: '"Requesta  Portal" <adtshrm1@gmail.com>',
-          to: updateStatus.studentId.email,
-          subject,
-          text,
-          html,
-        });
-      } catch (emailErr) {
-        console.error("Error sending registration email:", emailErr);
-      }
-    })();
 
-    if (!updateStatus)
-      return res.status(404).json({ message: "Leave not found" });
-    await updateStatus.save();
+    // Email notification (non-blocking)
+    if (applicant.email) {
+      (async () => {
+        try {
+          const { subject, text, html } = leaveUpdateTemplate(
+            applicant.name,
+            updateStatus.type,
+            updateStatus.status
+          );
+          await transport.sendMail({
+            from: '"Requesta Portal" <adtshrm1@gmail.com>',
+            to: applicant.email,
+            subject, text, html,
+          });
+        } catch (emailErr) {
+          console.error("Error sending admin leave update email:", emailErr);
+        }
+      })();
+    }
 
-    return res
-      .status(200)
-      .json({ message: "Status updated successfully", data: updateStatus });
+    return res.status(200).json({ message: "Status updated successfully", data: updateStatus });
   } catch (err) {
-    console.error("Error updating leaves:", err);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: err.message });
+    console.error("Error updating admin leaves:", err);
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// ── Get Audit Logs for an Admin Leave Request ─────────────────────────────────
+export const getAdminLeaveAuditLogs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const logs = await getLogsForRequest(id);
+    return res.status(200).json({ data: logs });
+  } catch (err) {
+    console.error("Error fetching admin leave audit logs:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };

@@ -16,8 +16,17 @@ const LeaveModelSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "forwarded", "accepted", "rejected"],
+      enum: ["pending", "forwarded", "approved", "rejected"],
       default: "pending",
+    },
+    currentHandlerRole: {
+      type: String,
+      enum: ["FACULTY", "DEPT_ADMIN"],
+      default: "FACULTY",
+    },
+    createdByRole: {
+      type: String,
+      default: "STUDENT",
     },
     supportingDocument: {
       type: String,
