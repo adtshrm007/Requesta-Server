@@ -289,3 +289,89 @@ export const getCertificateRequetsOfAStudentForAdmin = async (req, res) => {
     res.status(500).json({ error: "Server error while fetching leaves" });
   }
 };
+
+export const getDashboardStats = async (req, res) => {
+  try {
+    const role = req.user.role;
+    
+    if (role === "Faculty") {
+      const totalStudents = await Student.countDocuments();
+      const pendingLeaves = await LeaveModel.countDocuments({ currentHandlerRole: "FACULTY" });
+      
+      return res.status(200).json({
+        totalStudents,
+        pendingLeaves
+      });
+    }
+    
+    if (role === "Departmental Admin") {
+      const studentLeaves = await LeaveModel.find({ createdByRole: "STUDENT" });
+      const facultyLeaves = await LeaveAdminModel.find()
+        .populate({ path: "admin", match: { role: "Faculty" } })
+        .then(docs => docs.filter(d => d.admin !== null));
+        
+      let totalLeaves = studentLeaves.length + facultyLeaves.length;
+      let pendingLeaves = 0;
+      let forwardedLeaves = 0;
+      let approvedLeaves = 0;
+      let rejectedLeaves = 0;
+      
+      studentLeaves.forEach(l => {
+        if (l.status === "approved") approvedLeaves++;
+        else if (l.status === "rejected") rejectedLeaves++;
+        else if (l.status === "forwarded") forwardedLeaves++;
+        else pendingLeaves++; 
+      });
+      
+      facultyLeaves.forEach(l => {
+        if (l.status === "approved") approvedLeaves++;
+        else if (l.status === "rejected") rejectedLeaves++;
+        else pendingLeaves++;
+      });
+      
+      return res.status(200).json({
+        totalLeaves,
+        pendingLeaves,
+        forwardedLeaves,
+        approvedLeaves,
+        rejectedLeaves
+      });
+    }
+    
+    if (role === "Super Admin") {
+      const certificates = await Certificate.find();
+      const deptAdminLeaves = await LeaveAdminModel.find()
+        .populate({ path: "admin", match: { role: "Departmental Admin" } })
+        .then(docs => docs.filter(d => d.admin !== null));
+        
+      let totalRequests = certificates.length + deptAdminLeaves.length;
+      let pendingRequests = 0;
+      let approvedRequests = 0;
+      let rejectedRequests = 0;
+      
+      certificates.forEach(c => {
+        if (c.status === "approved") approvedRequests++;
+        else if (c.status === "rejected") rejectedRequests++;
+        else pendingRequests++;
+      });
+      
+      deptAdminLeaves.forEach(l => {
+        if (l.status === "approved") approvedRequests++;
+        else if (l.status === "rejected") rejectedRequests++;
+        else pendingRequests++;
+      });
+      
+      return res.status(200).json({
+        totalRequests,
+        pendingRequests,
+        approvedRequests,
+        rejectedRequests
+      });
+    }
+    
+    return res.status(403).json({ message: "Invalid role" });
+  } catch (error) {
+    console.error("Dashboard stats error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
