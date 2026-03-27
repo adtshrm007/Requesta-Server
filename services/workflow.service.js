@@ -1,9 +1,9 @@
 /**
  * Workflow Service — enforces RBAC transitions for all request types.
  *
- * Leave workflow (student):
- *   PENDING  →  Faculty can FORWARD  →  FORWARDED
- *   FORWARDED → DeptAdmin can APPROVE/REJECT
+ * Student leave workflow:
+ *   PENDING  → Faculty can FORWARD or REJECT → FORWARDED / REJECTED
+ *   PENDING or FORWARDED → DeptAdmin can APPROVE or REJECT directly
  *   SuperAdmin: BLOCKED on student leaves entirely
  *
  * Admin leave workflow:
@@ -18,36 +18,47 @@
 
 /**
  * Returns { allowed: bool, reason: string } for a student leave action.
- * @param {string} actorRole  - "Faculty" | "Departmental Admin" | "Super Admin"
+ * @param {string} actorRole    - "Faculty" | "Departmental Admin" | "Super Admin"
  * @param {string} targetStatus - the status actor wants to set
  * @param {string} currentStatus - current status of the leave
  */
 export function canActOnStudentLeave(actorRole, targetStatus, currentStatus) {
+  // Block actions on already-completed requests
+  if (currentStatus === "approved" || currentStatus === "rejected") {
+    return { allowed: false, reason: "This request has already been completed and cannot be modified." };
+  }
+
   if (actorRole === "Super Admin") {
     return { allowed: false, reason: "Super Admin cannot act on student leave requests." };
   }
 
   if (actorRole === "Faculty") {
-    if (targetStatus !== "forwarded") {
-      return { allowed: false, reason: "Faculty can only forward student leave requests, not approve or reject." };
+    // Faculty can ONLY forward or reject — NOT approve
+    if (targetStatus === "approved") {
+      return { allowed: false, reason: "Faculty cannot approve student leave requests. You may only forward or reject." };
+    }
+    if (!["forwarded", "rejected"].includes(targetStatus)) {
+      return { allowed: false, reason: "Faculty can only forward or reject student leave requests." };
     }
     if (currentStatus !== "pending") {
-      return { allowed: false, reason: "Faculty can only forward leaves that are currently pending." };
+      return { allowed: false, reason: "Faculty can only act on leaves that are currently pending." };
     }
     return { allowed: true };
   }
 
   if (actorRole === "Departmental Admin") {
+    // DeptAdmin can approve or reject at any point (pending or forwarded)
     if (!["approved", "rejected"].includes(targetStatus)) {
       return { allowed: false, reason: "Departmental Admin can only approve or reject student leave requests." };
     }
+    // Allow both pending (direct) and forwarded (after faculty)
     if (!["pending", "forwarded"].includes(currentStatus)) {
       return { allowed: false, reason: "Departmental Admin can only act on pending or forwarded leaves." };
     }
     return { allowed: true };
   }
 
-  return { allowed: false, reason: "Unknown role." };
+  return { allowed: false, reason: "Unknown or unauthorized role." };
 }
 
 // ─── Admin Leave Workflow ─────────────────────────────────────────────────────
@@ -60,12 +71,13 @@ export function canActOnStudentLeave(actorRole, targetStatus, currentStatus) {
  * @param {string} currentStatus - current leave status
  */
 export function canActOnAdminLeave(actorRole, submitterRole, targetStatus, currentStatus) {
-  if (!["approved", "rejected"].includes(targetStatus)) {
-    return { allowed: false, reason: "Only approve or reject are valid actions for admin leaves." };
+  // Block actions on already-completed requests
+  if (currentStatus === "approved" || currentStatus === "rejected") {
+    return { allowed: false, reason: "This leave has already been processed and cannot be modified." };
   }
 
-  if (currentStatus !== "pending") {
-    return { allowed: false, reason: "This leave has already been processed." };
+  if (!["approved", "rejected"].includes(targetStatus)) {
+    return { allowed: false, reason: "Only approve or reject are valid actions for admin leaves." };
   }
 
   // Faculty leave → Departmental Admin is authority
@@ -99,6 +111,7 @@ export function canActOnAdminLeave(actorRole, submitterRole, targetStatus, curre
  * Returns { allowed: bool, reason: string } for certificate actions.
  * Only Super Admin can approve/reject certificates.
  * @param {string} actorRole
+ * @param {string} currentStatus
  */
 export function canActOnCertificate(actorRole, currentStatus) {
   if (actorRole !== "Super Admin") {
@@ -107,7 +120,7 @@ export function canActOnCertificate(actorRole, currentStatus) {
       reason: "Only Super Admin can approve or reject certificate requests.",
     };
   }
-  if (currentStatus !== "pending") {
+  if (currentStatus === "approved" || currentStatus === "rejected") {
     return { allowed: false, reason: "This certificate has already been processed." };
   }
   return { allowed: true };

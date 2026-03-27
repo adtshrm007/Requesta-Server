@@ -16,7 +16,6 @@ export const handleLeaves = async (req, res) => {
     const student = await studentRegister.findById(req.user.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    // Smart validation
     const { errors, warnings } = await validateStudentLeaveSubmission({
       studentId: student._id,
       subject: req.body.subject,
@@ -40,14 +39,14 @@ export const handleLeaves = async (req, res) => {
       subject: req.body.subject,
       Reason: req.body.Reason,
       supportingDocument: supportingDocumentUrl,
-      currentHandlerRole: "FACULTY",
+      currentHandlerRole: "FACULTY",  // Always starts at Faculty
       createdBy: student._id,
       createdByRole: "STUDENT",
+      type: "LEAVE",
     });
 
     await newLeave.save();
 
-    // Audit log
     createLog({
       requestId: newLeave._id,
       requestType: "LEAVE",
@@ -58,7 +57,6 @@ export const handleLeaves = async (req, res) => {
       remarks: `Leave application submitted for: ${req.body.subject}`,
     });
 
-    // Email (non-blocking)
     sendLeaveEmail(student).catch((err) => console.error("Error sending leave email:", err));
 
     return res.status(201).json({
@@ -72,49 +70,52 @@ export const handleLeaves = async (req, res) => {
   }
 };
 
-// ── Get Leaves for Faculty (pending, their dept) ──────────────────────────────
+// ── Get Leaves for Faculty ────────────────────────────────────────────────────
+// Faculty sees ALL student leave requests where they are the current handler.
+// Visibility: only leaves with currentHandlerRole = "FACULTY" (pending, not yet forwarded/rejected)
 export const getAllLeaves = async (req, res) => {
   try {
-    const dept = req.user.department;
-    // Faculty sees only leaves where it's their turn
+    // Faculty sees leaves that are still in their queue (pending, not yet acted on)
     const leaves = await LeaveModel.find({ currentHandlerRole: "FACULTY" })
-      .populate({ path: "studentId", match: { branch: dept } })
-      .sort({ createdAt: -1 })
-      .then((leaves) => leaves.filter((leave) => leave.studentId !== null));
-    return res.json(leaves);
+      .populate("studentId")
+      .sort({ createdAt: -1 });
+
+    // Filter out null populates (shouldn't happen but safety net)
+    return res.json(leaves.filter((l) => l.studentId !== null));
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 };
 
-// ── Get Leaves for Departmental Admin (forwarded leaves, their dept) ──────────
+// ── Get Leaves for Departmental Admin ─────────────────────────────────────────
+// DeptAdmin sees ALL student leave requests (any status, for full oversight).
+// They can act on pending OR forwarded leaves (direct approval or post-faculty-forward).
 export const getLeavesForDepartmentalAdmin = async (req, res) => {
   try {
-    const dept = req.user.department;
-    // Dept Admin sees ALL student leaves assigned to their department
-    const leaves = await LeaveModel.find()
-      .populate({ path: "studentId", match: { branch: dept } })
-      .sort({ createdAt: -1 })
-      .then((leaves) => leaves.filter((leave) => leave.studentId !== null));
-    return res.json(leaves);
+    // DeptAdmin has full visibility into all student leave requests
+    // No branch/dept filter — the route is already guarded by VerifyRole("Departmental Admin")
+    const leaves = await LeaveModel.find({ createdByRole: "STUDENT" })
+      .populate("studentId")
+      .sort({ createdAt: -1 });
+
+    return res.json(leaves.filter((l) => l.studentId !== null));
   } catch (err) {
-    console.error("Error fetching leaves:", err);
+    console.error("Error fetching leaves for DeptAdmin:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
 
-// ── Get ALL leaves for Super Admin to VIEW (read-only) ────────────────────────
+// ── Get ALL student leaves for Super Admin (read-only oversight) ──────────────
 export const getLeavesForSuperAdmin = async (req, res) => {
   try {
-    // Super Admin can VIEW all leaves (all statuses) but cannot act on them
-    // Removed branch: dept match because Super Admins do not belong to a specific branch for global views
-    const leaves = await LeaveModel.find()
+    // Super Admin has full visibility — no dept/branch filter
+    const leaves = await LeaveModel.find({ createdByRole: "STUDENT" })
       .populate("studentId")
-      .sort({ createdAt: -1 })
-      .then((leaves) => leaves.filter((leave) => leave.studentId !== null));
-    return res.json(leaves);
+      .sort({ createdAt: -1 });
+
+    return res.json(leaves.filter((l) => l.studentId !== null));
   } catch (err) {
-    console.error("Error fetching leaves:", err);
+    console.error("Error fetching leaves for Super Admin:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -131,26 +132,26 @@ export const UpdateLeaves = async (req, res) => {
     const leave = await LeaveModel.findById(leaveId).populate("studentId");
     if (!leave) return res.status(404).json({ message: "Leave not found" });
 
-    // ── STRICT WORKFLOW CHECK ───────────────────────────────────────────────
+    // ── STRICT WORKFLOW CHECK (includes completed-request guard) ────────────
     const { allowed, reason } = canActOnStudentLeave(actorRole, status, leave.status);
     if (!allowed) {
       return res.status(403).json({ message: reason });
     }
 
-    // Determine next handler role
+    // Determine next handler role based on what action is taken
     let nextHandlerRole = leave.currentHandlerRole;
     if (status === "forwarded") {
       nextHandlerRole = "DEPT_ADMIN";
     } else if (status === "approved" || status === "rejected") {
-      nextHandlerRole = null; // Clears the handler queue
+      nextHandlerRole = null; // Request is done — remove from any queue
     }
 
-    // Update the leave
     const updateStatus = await LeaveModel.findByIdAndUpdate(
       leaveId,
       {
         status,
         remark: remark || leave.remark,
+        remarks: remark || leave.remarks,
         approvedBy: actorRole,
         currentHandlerRole: nextHandlerRole,
       },
@@ -165,7 +166,6 @@ export const UpdateLeaves = async (req, res) => {
         ? "REQUEST_APPROVED"
         : "REQUEST_REJECTED";
 
-    const admin = await AdminRegister.findById(req.user.id);
     createLog({
       requestId: leaveId,
       requestType: "LEAVE",
@@ -177,10 +177,11 @@ export const UpdateLeaves = async (req, res) => {
     });
 
     // Update admin stats
+    const admin = await AdminRegister.findById(req.user.id);
     if (admin) {
       if (status === "rejected") {
         await AdminRegister.findByIdAndUpdate(req.user.id, { $inc: { rejectedLeaveRequests: 1 } });
-      } else if (status === "approved" || status === "forwarded") {
+      } else if (status === "approved") {
         await AdminRegister.findByIdAndUpdate(req.user.id, { $inc: { acceptedLeaveRequests: 1 } });
       }
     }

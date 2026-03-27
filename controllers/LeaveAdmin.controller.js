@@ -12,7 +12,7 @@ export const submitLeaves = async (req, res) => {
     const admin = await AdminRegister.findById(req.user.id);
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
-    // Balance checks
+    // Leave balance checks
     if (admin.medicalLeaveLeft <= 0 && req.body.type === "Medical Leave") {
       return res.status(400).json({ message: "No Medical Leaves Left" });
     }
@@ -23,7 +23,6 @@ export const submitLeaves = async (req, res) => {
       return res.status(400).json({ message: "No Casual Leaves Left" });
     }
 
-    // Determine handler based on submitter role
     // Faculty leave → Departmental Admin handles it
     // Departmental Admin leave → Super Admin handles it
     const handlerRole = admin.role === "Faculty" ? "DEPT_ADMIN" : "SUPER_ADMIN";
@@ -49,7 +48,6 @@ export const submitLeaves = async (req, res) => {
 
     await newLeave.save();
 
-    // Audit log
     createLog({
       requestId: newLeave._id,
       requestType: "ADMIN_LEAVE",
@@ -70,7 +68,7 @@ export const submitLeaves = async (req, res) => {
   }
 };
 
-// ── Get own leaves (for the logged-in admin) ──────────────────────────────────
+// ── Get own leaves (logged-in admin) ──────────────────────────────────────────
 export const getAdminLeaves = async (req, res) => {
   try {
     const leave = await LeaveAdminModel.find({ admin: req.user.id })
@@ -82,7 +80,7 @@ export const getAdminLeaves = async (req, res) => {
   }
 };
 
-// ── Get ALL admin leaves (Super Admin sees everything) ────────────────────────
+// ── Get ALL admin leaves (full view for reporting) ────────────────────────────
 export const getAllAdminLeaves = async (req, res) => {
   try {
     const leave = await LeaveAdminModel.find()
@@ -94,17 +92,16 @@ export const getAllAdminLeaves = async (req, res) => {
   }
 };
 
-// ── Show Faculty Leaves (for Departmental Admin — leaves where it's their turn) ─
+// ── Show Faculty Leaves → for Departmental Admin ───────────────────────────────
+// DeptAdmin sees Faculty leaves that are assigned to them (currentHandlerRole = DEPT_ADMIN)
 export const showFacultyLeave = async (req, res) => {
   try {
-    const adminDepartment = req.user.department;
-    if (!adminDepartment) return res.status(404).json({ message: "Admin not found" });
-
-    // Dept Admin sees ALL faculty leaves assigned to their department
-    const leaves = await LeaveAdminModel.find()
+    // No dept filter — DeptAdmin is verified by route middleware (VerifyRole)
+    // Filter by currentHandlerRole to show only leaves in DeptAdmin's queue
+    const leaves = await LeaveAdminModel.find({ currentHandlerRole: "DEPT_ADMIN" })
       .populate({
         path: "admin",
-        match: { role: "Faculty", department: adminDepartment },
+        match: { role: "Faculty" },
       })
       .sort({ createdAt: -1 })
       .then((leaves) => leaves.filter((leave) => leave.admin !== null));
@@ -116,10 +113,11 @@ export const showFacultyLeave = async (req, res) => {
   }
 };
 
-// ── Show Departmental Admin Leaves (for Super Admin) ─────────────────────────
+// ── Show Departmental Admin Leaves → for Super Admin ──────────────────────────
+// Super Admin sees Dept Admin leaves assigned to them (currentHandlerRole = SUPER_ADMIN)
 export const showDepartemntalAdminLeave = async (req, res) => {
   try {
-    // Super Admin oversees all departments, so no strict department match is required
+    // Super Admin oversees all departments — no dept filter
     const leaves = await LeaveAdminModel.find({ currentHandlerRole: "SUPER_ADMIN" })
       .populate({
         path: "admin",
@@ -147,8 +145,8 @@ export const UpdateLeaves = async (req, res) => {
     const leave = await LeaveAdminModel.findById(leaveId).populate("admin");
     if (!leave) return res.status(404).json({ message: "Leave not found" });
 
-    // ── STRICT WORKFLOW CHECK ───────────────────────────────────────────────
-    const submitterRole = leave.admin?.role;
+    // ── STRICT WORKFLOW CHECK (includes completed-request guard in service) ──
+    const submitterRole = leave.admin?.role || leave.createdByRole;
     const { allowed, reason } = canActOnAdminLeave(actorRole, submitterRole, status, leave.status);
     if (!allowed) {
       return res.status(403).json({ message: reason });
@@ -156,11 +154,11 @@ export const UpdateLeaves = async (req, res) => {
 
     const updateStatus = await LeaveAdminModel.findByIdAndUpdate(
       leaveId,
-      { 
-        status, 
-        remark: remark || leave.remark, 
+      {
+        status,
+        remark: remark || leave.remark,
         approvedBy: actorRole,
-        currentHandlerRole: null // Clear handler queue 
+        currentHandlerRole: null, // Clear the queue — request is done
       },
       { new: true }
     ).populate("admin");
