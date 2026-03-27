@@ -12,6 +12,7 @@ import {
   loginAdminUsingEmail,
   getFacultyAdmins,
   getDepartmentalAdmin,
+  getDashboardStats,
 } from "../controllers/Admin.controller.js";
 import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 import { VerifyRole } from "../middleware/VerifyRole.js";
@@ -26,6 +27,7 @@ router.put("/changepassword", verifyAccessToken1, handlePasswordChange);
 router.get("/dashboard", verifyAccessToken1, (req, res) => {
   res.json({ data: req.user });
 });
+router.get("/dashboard-stats", verifyAccessToken1, getDashboardStats);
 router.put("/update", verifyAccessToken1, updateAdmin);
 router.get("/students", verifyAccessToken1, getAllStudentsDataForAdmin);
 router.get(
