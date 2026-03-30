@@ -47,21 +47,22 @@ export const generateRequest = async (req, res) => {
     const context =
       type === "CERTIFICATE" ? "certificate request" : "leave application";
 
-    const prompt = `You are an intelligent Academic Assistant specialized in extracting details and generating formal university documentation.
+    const prompt = `You are an intelligent Academic Assistant specialized in extracting details and generating professional documentation.
 
 User Input: "${rawText}"
 
 Task:
 1. Extract structured data: Reason, Start Date, End Date, and Duration (if mentioned).
-2. Expand this casual input into a highly professional ${context}.
+2. Rewrite the casual input into a highly professional ${context} statement.
 
 Rules for Generation:
-- DO NOT copy the source text directly.
-- SUBJECT: Generate a detailed, professional subject (NOT generic like 'Leave Application'). It must clearly mention the core reason and the duration/dates.
-- BODY: Generate a complete formal letter with professional greeting (e.g., "To the Concerned Authority,"), a detailed explanation, and a proper closing.
-- TONE: Maintain a polite, academic, and respectful tone throughout.
+- DO NOT copy the source text directly. 
+- REFRAME the reason using formal vocabulary (e.g., 'fever' -> 'acute health concerns').
+- SUBJECT: Generate a detailed, professional subject line (min 1 robust paragraph). Clearly mention the core reason and the duration/dates.
+- BODY: Generate ONLY the formal explanation/reasoning. DO NOT include greetings (like "Dear Authority") or closings (like "Sincerely"). Just the core content.
+- TONE: Professional, respectful, and direct.
 
-Respond ONLY with valid JSON in this exact format — no markdown, no wrapping text:
+Respond ONLY with valid JSON in this exact format:
 {
   "subject": "...",
   "body": "..."
@@ -88,7 +89,7 @@ Respond ONLY with valid JSON in this exact format — no markdown, no wrapping t
 
 const _generateFallback = (type, rawText) => ({
   subject: type === "CERTIFICATE" ? `Request for ${rawText || "Certificate"} Issuance` : `Application for Leave: ${rawText || "Personal Reasons"}`,
-  body: `Dear Authority,\n\nI am writing to formally request a ${type.toLowerCase()} regarding "${rawText || "my previous discussion"}". I would appreciate your support in processing this request at your earliest convenience.\n\nThank you for your time and consideration.\n\nSincerely,\n[ Your Name ]`,
+  body: `I am writing to formally request a ${type.toLowerCase()} regarding "${rawText || "my previous discussion"}". This request is necessitated by operational requirements and I would appreciate your support in processing it at your earliest convenience.`,
 });
 
 // ── MODULE 2: Validate Request ─────────────────────────────────────────────────
@@ -123,20 +124,20 @@ Supporting Document Uploaded?: ${hasDocument ? "YES" : "NO"}
 
 Validation Rules:
 1. SUBJECT: Must be descriptive and formal. Generic subjects like 'Leave' or 'Sick' are unacceptable.
-2. REASON: Must not be vague (e.g. 'some work', 'personal thing' are invalid). It must be clear and logical.
-3. DATES/DURATION: Must be explicitly mentioned within the reason or subject.
-4. MEDICAL/OFFICIAL: If a student mentions 'medical', 'sick', or 'fever' (or any official certificate) and NO document is uploaded, flag it as 'Needs Improvement'.
-5. SUSPICION: Detect generic, repetitive, or illogical claims.
+2. REASON: Must not be vague (e.g. 'some work', 'personal thing' are invalid). 
+3. DATES/DURATION: Must be explicitly mentioned.
+4. MEDICAL/OFFICIAL: If a student mentions 'medical', 'sick', or 'fever' and NO document is uploaded, flag it.
+5. REWRITE: The 'improvedVersion' should NOT include greetings or closings. It must be a direct professional statement reframing the user input without copying it.
 
-Respond ONLY with valid JSON — no markdown:
+Respond ONLY with valid JSON:
 {
   "validity": "Valid" | "Needs Improvement" | "Suspicious",
-  "issues": ["list of specific problems identified"],
-  "missingElements": ["list of explicit items the student forgot to include"],
-  "suggestions": ["clear actionable instructions to fix the request"],
+  "issues": ["list of problems"],
+  "missingElements": ["list of missing items"],
+  "suggestions": ["actionable instructions"],
   "improvedVersion": {
     "subject": "A revised, ultra-professional subject line",
-    "reason": "A revised, ultra-professional and detailed reason"
+    "reason": "A revised, ultra-professional and reframed reason (NO greetings or closings)"
   }
 }`;
 
