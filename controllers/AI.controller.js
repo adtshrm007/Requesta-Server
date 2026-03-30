@@ -45,55 +45,53 @@ export const generateRequest = async (req, res) => {
     }
 
     const context =
-      type === "CERTIFICATE"
-        ? "certificate issuance request (e.g. bonafide, transfer, degree certificate)"
-        : "leave application (e.g. medical leave, casual leave, study leave)";
+      type === "CERTIFICATE" ? "certificate request" : "leave application";
 
-    const prompt = `You are an assistant that converts casual user input into a formal leave or certificate application.
+    // ✅ FIXED PROMPT (with actual input injected)
+    const prompt = `
+You are an intelligent assistant that converts casual input into a structured professional ${context}.
 
 User Input:
-"{user_input}"
+"${rawText}"
 
-Extract the following:
-- Reason for leave
-- Start date
-- End date
+Step 1: Extract information:
+- Reason
+- Start Date (if any)
+- End Date (if any)
 - Duration (if possible)
 
-Then generate a professional application in the following JSON format:
+Step 2: Generate a formal application.
 
+Return ONLY valid JSON in this format:
 {
-  "subject": "A detailed and formal subject line (minimum 1 paragraph, clearly stating reason and duration)",
-  "body": "A complete formal application with proper greeting, explanation, and closing"
+  "subject": "A detailed, formal subject (at least 1 meaningful sentence, clearly mentioning reason and duration)",
+  "body": "A complete formal application with greeting, explanation, and closing"
 }
 
 Rules:
-- Do NOT copy the input directly
-- Expand and formalize the reason
-- Make the subject descriptive and professional (not just 'Leave Application')
-- Keep tone polite and formal`;
+- DO NOT copy input directly
+- Expand and formalize
+- Use professional tone
+- Ensure subject is descriptive (not generic)
+`;
 
     const parsed = await callGemini(prompt);
 
-    if (
-      !parsed.title ||
-      !parsed.description ||
-      !Array.isArray(parsed.suggestions)
-    ) {
-      throw new Error("AI response missing required fields");
+    // ✅ Expect correct fields
+    if (!parsed.subject || !parsed.body) {
+      throw new Error("Invalid AI response format");
     }
 
     return res.status(200).json({
-      title: parsed.title,
-      description: parsed.description,
-      suggestions: parsed.suggestions,
+      subject: parsed.subject,
+      body: parsed.body,
     });
   } catch (err) {
     console.error("[AI:generate] Error:", err.message);
+
     return res.status(200).json({
       ..._generateFallback(req.body?.type || "LEAVE", req.body?.rawText || ""),
-      error:
-        "AI service temporarily unavailable. Using smart suggestions instead.",
+      error: "AI service temporarily unavailable. Using fallback generator.",
     });
   }
 };
