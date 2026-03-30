@@ -11,28 +11,64 @@ import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 
 const router = express.Router();
 
+import jwt from "jsonwebtoken";
+import Student from "../models/studentRegister.model.js";
+import AdminRegister from "../models/adminRegister.model.js";
+
 /**
  * Dual-auth middleware: accepts both student and admin tokens.
- * Tries student first, then admin. Rejects if neither works.
  */
-const dualAuth = (req, res, next) => {
-  verifyAccessToken(req, res, (studentErr) => {
-    if (!studentErr) return next();
-    verifyAccessToken1(req, res, (adminErr) => {
-      if (!adminErr) return next();
-      return res.status(401).json({ message: "Authentication required" });
-    });
-  });
+const dualAuth = async (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Access token missing" });
+  }
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    if (decoded.registrationNumber) {
+      const student = await Student.findOne({ registrationNumber: decoded.registrationNumber });
+      if (student) {
+        req.user = { id: student._id, role: "Student", department: student.branch };
+        return next();
+      }
+    } else if (decoded.adminID) {
+      const admin = await AdminRegister.findOne({ adminID: decoded.adminID });
+      if (admin) {
+        req.user = { id: admin._id, role: admin.role, department: admin.department };
+        return next();
+      }
+    }
+    return res.status(403).json({ message: "User not found" });
+  } catch (err) {
+    return res.status(403).json({ message: "Invalid or expired token" });
+  }
 };
 
 /**
  * Admin-only middleware.
  */
-const adminOnly = (req, res, next) => {
-  verifyAccessToken1(req, res, (err) => {
-    if (err) return res.status(401).json({ message: "Admin authentication required" });
-    next();
-  });
+const adminOnly = async (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Access token missing" });
+  }
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    if (decoded.adminID) {
+      const admin = await AdminRegister.findOne({ adminID: decoded.adminID });
+      if (admin) {
+        req.user = { id: admin._id, role: admin.role, department: admin.department };
+        return next();
+      }
+    }
+    return res.status(403).json({ message: "Admin not found" });
+  } catch (err) {
+    return res.status(403).json({ message: "Invalid or expired token" });
+  }
 };
 
 // ── Module 1: Generate formal request text (student + admin) ──────────────────
