@@ -47,39 +47,30 @@ export const generateRequest = async (req, res) => {
     const context =
       type === "CERTIFICATE" ? "certificate request" : "leave application";
 
-    // ✅ FIXED PROMPT (with actual input injected)
-    const prompt = `
-You are an intelligent assistant that converts casual input into a structured professional ${context}.
+    const prompt = `You are an intelligent Academic Assistant specialized in extracting details and generating formal university documentation.
 
-User Input:
-"${rawText}"
+User Input: "${rawText}"
 
-Step 1: Extract information:
-- Reason
-- Start Date (if any)
-- End Date (if any)
-- Duration (if possible)
+Task:
+1. Extract structured data: Reason, Start Date, End Date, and Duration (if mentioned).
+2. Expand this casual input into a highly professional ${context}.
 
-Step 2: Generate a formal application.
+Rules for Generation:
+- DO NOT copy the source text directly.
+- SUBJECT: Generate a detailed, professional subject (NOT generic like 'Leave Application'). It must clearly mention the core reason and the duration/dates.
+- BODY: Generate a complete formal letter with professional greeting (e.g., "To the Concerned Authority,"), a detailed explanation, and a proper closing.
+- TONE: Maintain a polite, academic, and respectful tone throughout.
 
-Return ONLY valid JSON in this format:
+Respond ONLY with valid JSON in this exact format — no markdown, no wrapping text:
 {
-  "subject": "A detailed, formal subject (at least 1 meaningful sentence, clearly mentioning reason and duration)",
-  "body": "A complete formal application with greeting, explanation, and closing"
-}
-
-Rules:
-- DO NOT copy input directly
-- Expand and formalize
-- Use professional tone
-- Ensure subject is descriptive (not generic)
-`;
+  "subject": "...",
+  "body": "..."
+}`;
 
     const parsed = await callGemini(prompt);
 
-    // ✅ Expect correct fields
     if (!parsed.subject || !parsed.body) {
-      throw new Error("Invalid AI response format");
+      throw new Error("AI response missing required fields");
     }
 
     return res.status(200).json({
@@ -88,31 +79,16 @@ Rules:
     });
   } catch (err) {
     console.error("[AI:generate] Error:", err.message);
-
     return res.status(200).json({
       ..._generateFallback(req.body?.type || "LEAVE", req.body?.rawText || ""),
-      error: "AI service temporarily unavailable. Using fallback generator.",
+      error: "AI service temporarily unavailable. Using smart fallback.",
     });
   }
 };
 
 const _generateFallback = (type, rawText) => ({
-  title: type === "CERTIFICATE" ? "Certificate Request" : "Leave Application",
-  description: rawText || "",
-  suggestions:
-    type === "CERTIFICATE"
-      ? [
-          "Specify the exact type of certificate required (bonafide, transfer, etc.)",
-          "Include the purpose — job application, higher studies, bank loan, etc.",
-          "Mention if any urgency deadline exists.",
-          "Attach any supporting document requested by the institution.",
-        ]
-      : [
-          "Include the specific start and end dates of your leave.",
-          "State the exact reason clearly — medical, family emergency, etc.",
-          "Attach a supporting document (medical certificate, etc.) if applicable.",
-          "Mention if you need any academic considerations during your absence.",
-        ],
+  subject: type === "CERTIFICATE" ? `Request for ${rawText || "Certificate"} Issuance` : `Application for Leave: ${rawText || "Personal Reasons"}`,
+  body: `Dear Authority,\n\nI am writing to formally request a ${type.toLowerCase()} regarding "${rawText || "my previous discussion"}". I would appreciate your support in processing this request at your earliest convenience.\n\nThank you for your time and consideration.\n\nSincerely,\n[ Your Name ]`,
 });
 
 // ── MODULE 2: Validate Request ─────────────────────────────────────────────────
@@ -123,67 +99,64 @@ const _generateFallback = (type, rawText) => ({
  */
 export const validateRequest = async (req, res) => {
   try {
-    const { text, type = "LEAVE" } = req.body;
+    const { subject, reason, hasDocument = false, type = "LEAVE" } = req.body;
 
-    if (!text || text.trim().length < 10) {
+    if (!reason || reason.trim().length < 5) {
       return res.status(400).json({
-        message:
-          "Please provide the request text to validate (at least 10 characters).",
+        message: "Please provide the request reason to validate.",
       });
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return res.status(200).json(_validateFallback(text));
+      return res.status(200).json(_validateFallback(reason));
     }
 
     const context =
       type === "CERTIFICATE" ? "certificate request" : "leave application";
 
-    const prompt = `You are an academic review assistant for an Indian university management system.
+    const prompt = `You are a strict Administrative Reviewer for a University management system.
+Evaluate the following ${context} for validity, professionalism, and completeness.
 
-Evaluate this student's ${context}:
-"${text}"
+Subject: "${subject || "N/A"}"
+Reason: "${reason}"
+Supporting Document Uploaded?: ${hasDocument ? "YES" : "NO"}
 
-Check for:
-- Vague or informal language
-- Missing dates or duration
-- Lack of clear reason
-- Inappropriate tone
-- Suspicious or implausible claims
-- Very short or copy-pasted content
+Validation Rules:
+1. SUBJECT: Must be descriptive and formal. Generic subjects like 'Leave' or 'Sick' are unacceptable.
+2. REASON: Must not be vague (e.g. 'some work', 'personal thing' are invalid). It must be clear and logical.
+3. DATES/DURATION: Must be explicitly mentioned within the reason or subject.
+4. MEDICAL/OFFICIAL: If a student mentions 'medical', 'sick', or 'fever' (or any official certificate) and NO document is uploaded, flag it as 'Needs Improvement'.
+5. SUSPICION: Detect generic, repetitive, or illogical claims.
 
-Respond ONLY with valid JSON — no markdown, no wrapping text:
+Respond ONLY with valid JSON — no markdown:
 {
   "validity": "Valid" | "Needs Improvement" | "Suspicious",
-  "issues": ["what is currently missing or wrong"],
-  "actionableChanges": ["exactly what the student must add/do to fix the request"],
-  "suggestedRewrite": "Improved formal version of the request text..."
-}
-
-Rules:
-- "Valid" = clear, formal, specific, plausible
-- "Needs Improvement" = genuine but lacks details or formality
-- "Suspicious" = implausible, repetitive pattern, clearly fake or vague
-- issues array can be empty if Valid
-- actionableChanges MUST contain explicit instructions (e.g. "Add start and end dates", "Attach a medical certificate")
-- suggestedRewrite must be a complete rewritten version (not just notes)`;
+  "issues": ["list of specific problems identified"],
+  "missingElements": ["list of explicit items the student forgot to include"],
+  "suggestions": ["clear actionable instructions to fix the request"],
+  "improvedVersion": {
+    "subject": "A revised, ultra-professional subject line",
+    "reason": "A revised, ultra-professional and detailed reason"
+  }
+}`;
 
     const parsed = await callGemini(prompt);
 
-    if (!parsed.validity || !Array.isArray(parsed.issues)) {
-      throw new Error("AI response missing required fields");
+    if (!parsed.validity || !parsed.improvedVersion) {
+      throw new Error("AI response missing required validation fields");
     }
 
     return res.status(200).json({
       validity: parsed.validity,
-      issues: parsed.issues,
-      actionableChanges: parsed.actionableChanges || [],
-      suggestedRewrite: parsed.suggestedRewrite || "",
+      issues: parsed.issues || [],
+      missingElements: parsed.missingElements || [],
+      suggestions: parsed.suggestions || [],
+      improvedVersion: parsed.improvedVersion,
     });
   } catch (err) {
     console.error("[AI:validate] Error:", err.message);
     return res.status(200).json({
-      ..._validateFallback(req.body?.text || ""),
+      ..._validateFallback(req.body?.reason || ""),
       error: "AI validation service temporarily unavailable.",
     });
   }
@@ -195,11 +168,15 @@ const _validateFallback = (text) => ({
     "Could not perform AI validation — check if the text is sufficiently detailed.",
     "Ensure you include specific dates and a clear reason.",
   ],
-  actionableChanges: [
-    "Add specific dates",
-    "Clarify your exact reason for the request",
+  missingElements: ["Specific start and end dates", "A clear, formal reason"],
+  suggestions: [
+    "State your dates clearly",
+    "Provide a detailed reason for the request",
   ],
-  suggestedRewrite: "",
+  improvedVersion: {
+    subject: "Leave Application for Personal Reasons",
+    reason: text,
+  },
 });
 
 // ── MODULE 3: Approval Suggestion ─────────────────────────────────────────────
