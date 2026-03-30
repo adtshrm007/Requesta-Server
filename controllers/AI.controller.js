@@ -211,7 +211,7 @@ export const approvalSuggestion = async (req, res) => {
 
     const prompt = `You are an AI advisor for an Indian university leave management system.
 
-A ${reason.toLowerCase().includes("certificate") ? "certificate" : "leave"} request has been submitted.
+A ${(reason || "").toLowerCase().includes("certificate") ? "certificate" : "leave"} request has been submitted.
 
 Request Reason: "${reason || "(No text provided)"}"
 Duration/Period: ${duration}
@@ -231,7 +231,7 @@ Respond ONLY with valid JSON — no markdown:
 {
   "decision": "Approve" | "Reject" | "Review",
   "confidence": "High" | "Medium" | "Low",
-  "reasoning": "A clear 2-3 sentence explanation of the suggestion for the admin..."
+  "reasoning": "A clear 2-3 sentence explanation of the suggestion for the admin. Explicitly state WHY confidence is High/Medium/Low (e.g., 'Confidence is low because the reason is vague and no document is attached.')."
 }`;
 
     const parsed = await callGemini(prompt);
