@@ -162,21 +162,136 @@ Return JSON:
 };
 
 
+/**
+ * @description REDESIGNED: Data-First System Insights
+ * Computes REAL role-based analytics and uses AI exclusively for interpretation.
+ */
 export const systemInsights = async (req, res) => {
   try {
+    const { role, department } = req.user;
+    const isSuperAdmin = role === "Super Admin";
+    const adminDeptMatch = isSuperAdmin ? {} : { department: department };
+
+    // ── 1. AGGREGATION PIPELINES ─────────────────────────────────────────────
+    
+    // A. Leave Type Distribution (Faculty/Admin)
+    const leaveTypeDist = await LeaveAdminModel.aggregate([
+      { $match: adminDeptMatch },
+      { $group: { _id: "$type", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // B. Student vs Faculty Distribution (Volume)
+    // For students, we filter by branch (department) via lookup
+    const studentVol = await LeaveModel.aggregate([
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "studentInfo"
+        }
+      },
+      { $unwind: "$studentInfo" },
+      { $match: isSuperAdmin ? {} : { "studentInfo.branch": department } },
+      { $count: "total" }
+    ]);
+
+    const facultyVol = await LeaveAdminModel.countDocuments(adminDeptMatch);
+
+    // C. Department-wise Leave Counts (Branch Distribution)
+    const branchDist = await LeaveModel.aggregate([
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "studentInfo"
+        }
+      },
+      { $unwind: "$studentInfo" },
+      { $match: isSuperAdmin ? {} : { "studentInfo.branch": department } },
+      { $group: { _id: "$studentInfo.branch", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // D. Certificate Request Trends
+    const certTrends = await Certificate.aggregate([
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "student",
+          foreignField: "_id",
+          as: "studentInfo"
+        }
+      },
+      { $unwind: "$studentInfo" },
+      { $match: isSuperAdmin ? {} : { "studentInfo.branch": department } },
+      { $group: { _id: "$CertificateType", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // E. Approval vs Rejection Rates
+    const [studentStatus, facultyStatus] = await Promise.all([
+      LeaveModel.aggregate([
+        {
+          $lookup: { from: "studentregisters", localField: "studentId", foreignField: "_id", as: "si" }
+        },
+        { $unwind: "$si" },
+        { $match: isSuperAdmin ? {} : { "si.branch": department } },
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+      ]),
+      LeaveAdminModel.aggregate([
+        { $match: adminDeptMatch },
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+      ])
+    ]);
+
+    // F. Average Leave Duration (Faculty)
+    const avgDuration = await LeaveAdminModel.aggregate([
+      { $match: adminDeptMatch },
+      {
+        $project: {
+          duration: {
+            $divide: [
+              { $subtract: ["$toDate", "$fromDate"] },
+              1000 * 60 * 60 * 24 // Convert ms to days
+            ]
+          }
+        }
+      },
+      { $group: { _id: null, avgDays: { $avg: "$duration" } } }
+    ]);
+
+    // ── 2. PREPARE DATA FOR AI ───────────────────────────────────────────────
     const stats = {
-      leaves: await LeaveModel.countDocuments(),
-      certificates: await Certificate.countDocuments(),
-      adminLeaves:await LeaveAdminModel.countDocuments(),
+      role,
+      department: department || "All",
+      totalStudentLeaves: studentVol[0]?.total || 0,
+      totalFacultyLeaves: facultyVol,
+      leaveTypeDistribution: leaveTypeDist,
+      branchDistribution: branchDist,
+      certificateTrends: certTrends,
+      statusBreakdown: {
+        students: studentStatus,
+        faculty: facultyStatus
+      },
+      averageFacultyDuration: avgDuration[0]?.avgDays?.toFixed(1) || 0,
+      timestamp: new Date().toISOString()
     };
 
+    // ── 3. AI INTERPRETATION LAYER ───────────────────────────────────────────
     const prompt = `
-Analyze system:
+Analyze institutional request metrics for a ${role} in ${department || "the entire system"}.
+DATA: ${JSON.stringify(stats)}
 
-Leaves: ${stats.leaves}
-Certificates: ${stats.certificates}
+STRICT REQUIREMENTS:
+- Reference actual numbers (e.g., "Medical leaves represent X%").
+- No generic AI fluff.
+- Identify bottlenecks (e.g., "Dept A has Y pending requests").
+- Actionable suggestions for a ${role}.
 
-Return JSON:
+RETURN JSON:
 {
   "trends": [],
   "alerts": [],
@@ -184,13 +299,19 @@ Return JSON:
 }
 `;
 
-    const parsed = await callAIWithFallback(prompt);
+    const aiResponse = await callAIWithFallback(prompt);
 
     return res.json({
-      ...parsed,
+      ...aiResponse,
       stats,
     });
-  } catch {
-    return res.json(_insightsFallback({}));
+  } catch (err) {
+    console.error("[systemInsights] Redesign Error:", err);
+    return res.json({
+      trends: ["Data analysis currently unavailable."],
+      alerts: ["System is experiencing high load during aggregation."],
+      suggestions: ["Try again in a few minutes."],
+      stats: { error: true }
+    });
   }
 };
