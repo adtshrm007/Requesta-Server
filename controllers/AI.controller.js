@@ -1,4 +1,7 @@
 import { callAIWithFallback } from "../utils/aiClient.js";
+import LeaveModel from "../models/leave.model.js";
+import LeaveAdminModel from "../models/LeaveAdmins.model.js";
+import Certificate from "../models/certificate.model.js";
 
 export const generateRequest = async (req, res) => {
   try {
@@ -164,6 +167,7 @@ export const systemInsights = async (req, res) => {
     const stats = {
       leaves: await LeaveModel.countDocuments(),
       certificates: await Certificate.countDocuments(),
+      adminLeaves:await LeaveAdminModel.countDocuments(),
     };
 
     const prompt = `
