@@ -1,126 +1,413 @@
-# Requesta Server Application
+# 🚀 Requesta Server Application
 
-Welcome to the **Requesta Server**! This repository houses the powerful, strict REST API backend that governs the Requesta system. It manages sophisticated multi-tier hierarchical approvals, secure real-time file persistence, JWT-based authentication arrays, and automated institutional email pipelines.
+Welcome to the **Requesta Server** — the core intelligence layer powering the Requesta ecosystem. This backend is not just a REST API, but a **workflow engine + analytics system + AI orchestration layer** built to handle institutional-scale request management.
 
----
+It manages:
 
-## 🚀 Technical Stack Breakdown
-
-The Requesta backend utilizes a hardened **MERN architecture (MongoDB, Express, Node.js)** layered with multiple external services.
-
-| Technology | Purpose |
-|------------|---------|
-| **Node.js + Express 5** | High-performance asynchronous runtime paired with Express for rapid route parsing and middleware chaining. |
-| **MongoDB + Mongoose** | Document-oriented data modeling. Used for strict schema validation, complex data aggregation, and relationship populating (e.g., matching a Leave securely back to a User). |
-| **JWT & bcryptjs** | Industry-standard security. bcrypt hashes passwords with salt, and JSON Web Tokens ensure stateless, un-forgeable HTTP authorization capabilities. |
-| **Multer + Cloudinary** | Cloud object storage synchronization. `multer-storage-cloudinary` intercepts multi-part form data uploads directly in the Express route and pipes files to Cloudinary seamlessly. |
-| **Nodemailer + Resend** | Email automation. Dispatches branded HTML emails immediately upon registration, password resets (OTPs), or status updates to a user's request. |
-| **Google Gemini AI SDK**| AI integration. The backend `AI.controller.js` parses complex requests using strictly structured JSON prompts to generate analytics and text validation for the Requesta UI. |
+* 🔐 Secure authentication & authorization
+* 🔄 Multi-level approval workflows
+* ☁️ File storage pipelines
+* 📊 Data-driven analytics
+* 🧠 AI-powered decision systems
 
 ---
 
-## ⚙️ The Deep Architecture
+# 🌟 Core Philosophy
 
-The codebase cleanly separates concerns to allow for rapid debugging and scale. 
+> **Data-first. AI-enhanced. Production-ready.**
 
-### Core Hierarchy Model (MVC-Inspired)
+Unlike traditional systems:
+
+* AI does **not guess blindly**
+* AI **interprets structured MongoDB data**
+* Every decision is **traceable, explainable, and role-aware**
+
+---
+
+# 🧱 Tech Stack
+
+| Technology                               | Purpose                                                       |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| **Node.js + Express 5**                  | High-performance backend runtime with middleware architecture |
+| **MongoDB + Mongoose**                   | Schema modeling + aggregation pipelines for analytics         |
+| **JWT + bcryptjs**                       | Secure authentication and password hashing                    |
+| **Multer + Cloudinary**                  | Seamless file uploads with cloud persistence                  |
+| **Nodemailer + Resend**                  | Automated transactional email pipelines                       |
+| **AI Layer (Gemini / OpenRouter-ready)** | Structured AI processing (generation, validation, insights)   |
+
+---
+
+# 🏗️ System Architecture
 
 ```text
-server/Requesta-Server/
-├── models/             # Schema definitions (The "M" in MVC)
-│   ├── adminRegister.model.js  # Defines Faculty, Dept Admin, Super Admin
-│   ├── studentRegister.model.js# Defines Student schema & password compare methods 
-│   ├── leave.model.js          # The core Request mapping schema
-│   ├── certificate.model.js    # Certificate request schema
-├── middlewares/        # Express Interceptors
-│   ├── verifyToken.js          # Strips Bearer tokens from incoming requests & validates them
-├── routes/             # Endpoint Maps (The "V/Router")
-│   ├── Admin.routes.js         # Defines /api/adminregister APIs
-│   ├── Leave.routes.js         # Maps /api/leaves
-├── controllers/        # Business Logic (The "C" in MVC)
-│   ├── Admin.controller.js     # Does the heavy lifting. Aggregates analytics, registers admins.
-│   ├── Leave.controller.js     # Executes the "Forward", "Approve", "Reject" logic.
-│   ├── AI.controller.js        # Powers the intelligent Generation, Validation, and Insights routing.
-├── services/           # Reusable functional blocks (e.g., custom workflow engines)
-├── templates/          # React-esque raw HTML strings injected into emails via Nodemailer
-└── server.js           # Server instantiator, MongoDB bootstrapper, and global error catcher.
+Client (React SPA)
+   ↓
+Express API Layer
+   ↓
+AI Orchestration Layer
+   ↓
+MongoDB (Data + Aggregations)
+   ↓
+External Services (Cloudinary, Email)
 ```
 
 ---
 
-## 🔄 The Smart Approval Workflow (How it Works)
+# 📁 Project Structure
 
-The beating heart of Requesta is its hierarchical workflow engine. Here is explicitly how the website manages data routing beneath the surface:
-
-1. **Submission Phase**
-   - A student submits a leave with a PDF medical document via a standard `POST` route.
-   - **Multer Middleware** catches the PDF mid-flight, creates a stream to Cloudinary, and waits for a secure URL return.
-   - The **Leave Controller** creates a MongoDB document. It tags `status: "pending"` and flags the `currentHandlerRole: "FACULTY"`. 
-   
-2. **Faculty Triage Phase**
-   - A Faculty member logs in. The API queries MongoDB for `Leave.find({ currentHandlerRole: "FACULTY" })`. Note that the faculty member *cannot* see leaves explicitly forwarded past them.
-   - **Scenario A:** Faculty clicks "Approve" -> DB updates to `status: "approved"`. Flow ends.
-   - **Scenario B:** Faculty clicks "Forward" -> DB updates to `status: "forwarded"`, but crucially, updates `currentHandlerRole: "DEPARTMENTAL ADMIN"`. The document vanishes from the Faculty queue instantly.
-
-3. **Administrative Finalization Phase**
-   - The Department Admin logs in. Their API query fires `Leave.find({ currentHandlerRole: "DEPARTMENTAL ADMIN" })`.
-   - The Department Admin issues the final approval or rejection.
-
-Similar parallel pipelines exist for **Faculty Leaves** (Faculty -> Dept Admin) and **Department Admin Leaves / Certificates** (Dept Admin -> Super Admin).
-
----
-
-## 📊 Analytics Aggregation Engine
-
-Requesta provides massive analytical insight directly baked into a single endpoint: `/api/adminregister/dashboard-stats`. 
-
-Inside `Admin.controller.js`, the platform checks `req.user.role` (which was appended securely by the JWT middle layer). 
-- If **Departmental Admin**: It launches parallel aggregations using `Promise.all` or sequential `.find()` queries to count strictly the leaves generated in their department, returning exact integers for approved/rejected.
-- If **Super Admin**: It sweeps the entire database across `Certificates` and `LeaveAdminModels` to provide total institutional transparency.
+```text
+server/Requesta-Server/
+├── models/
+│   ├── adminRegister.model.js
+│   ├── studentRegister.model.js
+│   ├── leave.model.js
+│   ├── certificate.model.js
+├── middlewares/
+│   ├── verifyToken.js
+├── routes/
+│   ├── Admin.routes.js
+│   ├── Leave.routes.js
+│   ├── AI.routes.js
+├── controllers/
+│   ├── Admin.controller.js
+│   ├── Leave.controller.js
+│   ├── AI.controller.js   # Core AI brain
+├── services/
+├── templates/
+├── server.js
+```
 
 ---
 
-## 🧠 AI Integration & Advanced Prompts
+# 🔄 Hierarchical Workflow Engine
 
-The Requesta backend manages all interactions with Google Gemini via `AI.controller.js`. Instead of letting the AI output raw, unformatted responses, the controller enforces rigid schemas and contextual restrictions:
-1. **System Insights Pipeline:** `GET /system-insights` evaluates real-time MongoDB metrics (total leaves, rejections, active certificates, and frequent applicants) and injects this data into the AI prompt to produce highly accurate, localized observations.
-2. **Approval Context Filtering:** The payload sent from the frontend is evaluated locally on the server. The AI explicitly examines the `hasDocument` boolean payload; if a student attaches a medical proxy via Cloudinary, the backend instructs the AI to rate the Request safely for Approval, bypassing text-length rules.
-3. **Structured Fallbacks:** Should the Gemini service time out or the `GEMINI_API_KEY` be missing, the backend degrades gracefully, returning a localized JSON structure that continues to provide standard advice to the frontend components.
+Requesta implements a **strict multi-level approval pipeline**:
 
 ---
 
-## 🛠️ Environment Variables Config (`.env`)
+## 🧩 Flow Breakdown
 
-Before running the server, you must have a `.env` file populated at the root of the server directory:
+### 1. Submission Phase
 
-| Variable | Purpose |
-|----------|---------|
-| `PORT` | Local runtime port (default: 5000) |
-| `MONGODB_URI` | Full connection string to MongoDB Cluster |
-| `ACCESS_TOKEN_SECRET` | Ultra-secure randomized string for generating JWT tokens |
-| `REFRESH_TOKEN_SECRET`| String for generating long-lived session tokens |
-| `CLOUDINARY_CLOUD_NAME`| Cloudinary Cloud Name identifier |
-| `CLOUDINARY_API_KEY` | Cloudinary API Key |
-| `CLOUDINARY_API_SECRET`| Cloudinary secure secret |
-| `EMAIL` | System email address sending SMTP requests |
-| `PASSWORD` | System app-password for SMTP server authentication |
-| `GEMINI_API_KEY` | Google Generative AI key for enabling AI features in Requesta |
+* Student submits leave with optional document
+* Multer streams file → Cloudinary
+* Leave document created:
+
+```json
+{
+  "status": "pending",
+  "currentHandlerRole": "FACULTY"
+}
+```
 
 ---
 
-## 🏃 Running the Server
+### 2. Faculty Layer
 
-1. **Install Sub-dependencies**
-   ```bash
-   cd server/Requesta-Server
-   npm install
-   ```
+* Faculty sees only:
 
-2. **Boot the App (Development Mode)**
-   ```bash
-   npm run dev
-   ```
-   *This initiates `nodemon`, which listens for file saves and hot-reloads the Express server instantly.*
+```js
+Leave.find({ currentHandlerRole: "FACULTY" })
+```
 
-3. **Database Connectivity**
-   Ensure your local IP is whitelisted on MongoDB Atlas. You will cleanly see `MongoDB connected...` logged to the console upon successful boot sequence. All REST APIs will now resolve successfully via `http://localhost:5000/api/...`
+#### Actions:
+
+* ✅ Approve → Ends flow
+* 🔁 Forward → Moves to Admin
+
+---
+
+### 3. Department Admin Layer
+
+* Sees forwarded requests
+* Final decision authority
+
+---
+
+### 🔁 Parallel Flows
+
+| Request Type  | Flow                        |
+| ------------- | --------------------------- |
+| Student Leave | Student → Faculty → Admin   |
+| Faculty Leave | Faculty → Admin             |
+| Admin Leave   | Admin → Super Admin         |
+| Certificate   | Student/Admin → Super Admin |
+
+---
+
+# 📊 Analytics Engine (Data-First)
+
+Unlike generic dashboards, Requesta uses **MongoDB Aggregations** to compute real insights:
+
+### 🔍 Core Metrics
+
+* Leave type distribution (Medical, Casual)
+* Role-based usage (Student vs Faculty)
+* Department-wise activity
+* Approval vs rejection ratios
+* Certificate demand trends
+* Frequent applicants
+
+---
+
+### ⚡ Example Aggregation
+
+```js
+LeaveModel.aggregate([
+  { $group: { _id: "$type", count: { $sum: 1 } } },
+  { $sort: { count: -1 } }
+]);
+```
+
+---
+
+# 🧠 AI Orchestration Layer
+
+Located in: `AI.controller.js`
+
+---
+
+## ⚙️ Key Principle
+
+> AI is used as an **analyst**, not a generator.
+
+---
+
+## 🔹 Modules
+
+### 1. ✍️ Request Generation
+
+* Converts casual input → formal structured request
+* Returns strict JSON:
+
+```json
+{
+  "subject": "...",
+  "body": "..."
+}
+```
+
+---
+
+### 2. ✅ Request Validation
+
+* Checks:
+
+  * clarity
+  * completeness
+  * professionalism
+* Returns:
+
+```json
+{
+  "validity": "...",
+  "issues": [],
+  "suggestions": [],
+  "improvedVersion": {}
+}
+```
+
+---
+
+### 3. 🤖 Approval Suggestion
+
+* Inputs:
+
+  * reason
+  * duration
+  * history
+  * document presence
+* Outputs:
+
+```json
+{
+  "decision": "Approve | Reject | Review",
+  "confidence": "High | Medium | Low",
+  "reasoning": "..."
+}
+```
+
+---
+
+### 4. 📊 System Insights (Advanced)
+
+#### 🔥 Hybrid Pipeline:
+
+1. MongoDB Aggregations → Structured Data
+2. AI → Interpretation Layer
+
+---
+
+#### Example AI Input:
+
+```json
+{
+  "leaveTypes": [...],
+  "roleStats": [...],
+  "certTypes": [...]
+}
+```
+
+---
+
+#### Output:
+
+```json
+{
+  "trends": [],
+  "alerts": [],
+  "suggestions": []
+}
+```
+
+---
+
+### 🚨 Fail-Safe Design
+
+* AI failures NEVER crash API
+* Automatic fallback responses
+* Graceful degradation
+
+---
+
+# 🔐 Security Layer
+
+* JWT-based stateless authentication
+* Role-based access control (RBAC)
+* Password hashing with bcrypt
+* Protected middleware routes
+* Secure file handling
+
+---
+
+# ☁️ File Handling Pipeline
+
+```text
+Client Upload → Multer → Cloudinary → URL stored in MongoDB
+```
+
+Supports:
+
+* Medical certificates
+* Supporting documents
+
+---
+
+# 📧 Email Automation
+
+Triggered events:
+
+* Registration
+* OTP verification
+* Leave status updates
+* Certificate approvals
+
+Uses:
+
+* Nodemailer / Resend
+* Dynamic HTML templates
+
+---
+
+# 🛠️ Environment Configuration
+
+Create `.env`:
+
+```env
+PORT=5000
+MONGODB_URI=your_uri
+ACCESS_TOKEN_SECRET=your_secret
+REFRESH_TOKEN_SECRET=your_refresh_secret
+
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+
+EMAIL=...
+PASSWORD=...
+
+GEMINI_API_KEY=...
+OPENROUTER_API_KEY=...  # (recommended upgrade)
+```
+
+---
+
+# ▶️ Running the Server
+
+### Install dependencies
+
+```bash
+npm install
+```
+
+---
+
+### Start development server
+
+```bash
+npm run dev
+```
+
+---
+
+### Expected Output
+
+```text
+MongoDB connected...
+Server running on port 5000
+```
+
+---
+
+# 🚀 Key Differentiators
+
+### ✅ Data-Driven AI
+
+AI decisions are based on real data, not assumptions
+
+---
+
+### ✅ Role-Aware System
+
+Different logic for:
+
+* Students
+* Faculty
+* Admins
+* Super Admins
+
+---
+
+### ✅ Scalable Architecture
+
+* Clean separation of concerns
+* Modular AI system
+* Easily extendable
+
+---
+
+### ✅ Production-Ready Design
+
+* Fail-safe AI
+* Secure APIs
+* Optimized queries
+
+---
+
+# 🔮 Future Enhancements
+
+* 📊 Real-time analytics dashboards (charts)
+* 🔔 WebSocket-based notifications
+* 🧠 AI anomaly detection (fraud patterns)
+* ⚡ Response caching for AI calls
+* 🌐 Multi-institution support
+
+---
+
+# 📌 Final Note
+
+Requesta Server is not just a backend — it is a **decision-making engine** for institutional workflows.
+
+> Built for scale. Designed for clarity. Powered by intelligence.
+
+---
