@@ -40,9 +40,9 @@ const dualAuth = async (req, res, next) => {
         return next();
       }
     }
-    return res.status(403).json({ message: "User not found" });
+    return res.status(403).json({ message: "User not found", decoded });
   } catch (err) {
-    return res.status(403).json({ message: "Invalid or expired token" });
+    return res.status(403).json({ message: "Invalid or expired token", error: err.message, stack: err.stack });
   }
 };
 
