@@ -142,7 +142,8 @@ Check for:
 Respond ONLY with valid JSON — no markdown, no wrapping text:
 {
   "validity": "Valid" | "Needs Improvement" | "Suspicious",
-  "issues": ["specific issue 1", "specific issue 2"],
+  "issues": ["what is currently missing or wrong"],
+  "actionableChanges": ["exactly what the student must add/do to fix the request"],
   "suggestedRewrite": "Improved formal version of the request text..."
 }
 
@@ -151,6 +152,7 @@ Rules:
 - "Needs Improvement" = genuine but lacks details or formality
 - "Suspicious" = implausible, repetitive pattern, clearly fake or vague
 - issues array can be empty if Valid
+- actionableChanges MUST contain explicit instructions (e.g. "Add start and end dates", "Attach a medical certificate")
 - suggestedRewrite must be a complete rewritten version (not just notes)`;
 
     const parsed = await callGemini(prompt);
@@ -162,6 +164,7 @@ Rules:
     return res.status(200).json({
       validity: parsed.validity,
       issues: parsed.issues,
+      actionableChanges: parsed.actionableChanges || [],
       suggestedRewrite: parsed.suggestedRewrite || "",
     });
   } catch (err) {
@@ -179,6 +182,7 @@ const _validateFallback = (text) => ({
     "Could not perform AI validation — check if the text is sufficiently detailed.",
     "Ensure you include specific dates and a clear reason.",
   ],
+  actionableChanges: ["Add specific dates", "Clarify your exact reason for the request"],
   suggestedRewrite: "",
 });
 
@@ -190,10 +194,11 @@ const _validateFallback = (text) => ({
  */
 export const approvalSuggestion = async (req, res) => {
   try {
-    const { reason, duration = "Not specified", userHistory } = req.body;
+    const { reason, duration = "Not specified", userHistory, hasDocument = false } = req.body;
 
-    if (!reason || reason.trim().length < 5) {
-      return res.status(400).json({ message: "Reason is required for suggestion." });
+    // We allow short reasons if they provide a document
+    if (!reason && !hasDocument) {
+      return res.status(400).json({ message: "Reason or Document is required." });
     }
 
     if (!process.env.GEMINI_API_KEY) {
@@ -208,8 +213,9 @@ export const approvalSuggestion = async (req, res) => {
 
 A ${reason.toLowerCase().includes("certificate") ? "certificate" : "leave"} request has been submitted.
 
-Request Reason: "${reason}"
+Request Reason: "${reason || "(No text provided)"}"
 Duration/Period: ${duration}
+Supporting Document Attached?: ${hasDocument ? "YES - Student uploaded a file (e.g., Medical cert, official proof)." : "NO DOCUMENT ATTACHED."}
 ${historyContext}
 
 Evaluate whether this request should be Approved, Rejected, or needs further Review.
@@ -218,6 +224,7 @@ Consider:
 - Clarity and validity of the reason
 - Reasonableness of the duration
 - If historical data shows frequent requests or rejection patterns
+- HUGE FACTOR: If a document is attached (YES), you can confidently suggest 'Approve' even if the text reason is short (like 'sick'). If NO document is attached for a medical/official reason, suggest 'Review'.
 - Institutional norms (e.g., vague "personal work" = suspicious; medical with document = valid)
 
 Respond ONLY with valid JSON — no markdown:
@@ -444,31 +451,30 @@ export const systemInsights = async (req, res) => {
       return res.status(200).json(_insightsFallback(systemData));
     }
 
-    const prompt = `You are an AI analytics advisor for a university leave and certificate management system.
+    const prompt = `You are a Senior Data Analyst at a top-tier university, providing extremely sharp, non-obvious insights into our leave/certificate workflows.
 
-Here is the system data for the last 30 days:
+Here is the exact numeric data for the last 30 days:
 - Leave requests submitted: ${systemData.currentPeriodLeaves} (vs ${systemData.prevPeriodLeaves} the previous period, ${changePct > 0 ? "+" : ""}${changePct}% change)
 - Pending leaves: ${systemData.pendingLeaves}
 - Approved leaves: ${systemData.approvedLeaves}
 - Rejected leaves: ${systemData.rejectedLeaves}
-- Pending certificates: ${systemData.pendingCertificates}
-- Top frequent applicants: ${systemData.frequentApplicants.join(", ") || "None"}
+- Pending certificates backlog: ${systemData.pendingCertificates}
+- Our top most frequent applicants: ${systemData.frequentApplicants.join(", ") || "None"}
 
-Generate actionable insights in 3 categories:
+Generate highly actionable, intelligent insights. Do not just repeat the numbers. Synthesize what the numbers mean for operational efficiency, bottlenecks, and student behavior.
 
 Respond ONLY with valid JSON — no markdown:
 {
-  "trends": ["Trend statement 1", "Trend statement 2"],
-  "alerts": ["Alert 1 requiring admin attention", "Alert 2"],
-  "suggestions": ["Actionable suggestion 1", "Suggestion 2"]
+  "trends": ["Deep analytical observation 1", "Deep analytical observation 2"],
+  "alerts": ["Severe bottleneck or risk alert 1", "Operational alert 2"],
+  "suggestions": ["Concrete policy/process recommendation 1", "Recommendation 2"]
 }
 
 Rules:
-- trends: factual observations about patterns (2-3 items)
-- alerts: anything requiring immediate attention (1-3 items, can be empty array)
-- suggestions: practical recommendations for improving the process (2-3 items)
-- Keep each item to 1 sentence
-- Be specific with numbers where available`;
+- trends: Combine multiple data points to form a narrative (e.g., "Despite a drop in overall requests, pending backlogs remain high, indicating administrative slowdowns").
+- alerts: Focus on processing delays, high rejection rates, or unusual student behavior.
+- suggestions: Give actionable workflow adjustments (e.g., "Implement auto-approval for top frequent applicants" or "Clear the certificate backlog before midterms").
+- Keep items concise but powerful.`;
 
     const parsed = await callGemini(prompt);
 
