@@ -49,25 +49,37 @@ export const generateRequest = async (req, res) => {
         ? "certificate issuance request (e.g. bonafide, transfer, degree certificate)"
         : "leave application (e.g. medical leave, casual leave, study leave)";
 
-    const prompt = `You are an academic assistant helping students write formal ${context}s for an Indian university.
+    const prompt = `You are an assistant that converts casual user input into a formal leave or certificate application.
 
-Student's rough description: "${rawText}"
+User Input:
+"{user_input}"
 
-Task:
-1. Generate a concise, formal title (max 10 words)
-2. Rewrite the description in professional academic language (3-5 sentences, first-person, respectful tone, addressed to the authority)
-3. List 2-4 specific improvements to strengthen this request (dates, supporting documents, specific reason, duration)
+Extract the following:
+- Reason for leave
+- Start date
+- End date
+- Duration (if possible)
 
-Respond ONLY with valid JSON in this exact format — no markdown, no wrapping text:
+Then generate a professional application in the following JSON format:
+
 {
-  "title": "...",
-  "description": "...",
-  "suggestions": ["...", "...", "..."]
-}`;
+  "subject": "A detailed and formal subject line (minimum 1 paragraph, clearly stating reason and duration)",
+  "body": "A complete formal application with proper greeting, explanation, and closing"
+}
+
+Rules:
+- Do NOT copy the input directly
+- Expand and formalize the reason
+- Make the subject descriptive and professional (not just 'Leave Application')
+- Keep tone polite and formal`;
 
     const parsed = await callGemini(prompt);
 
-    if (!parsed.title || !parsed.description || !Array.isArray(parsed.suggestions)) {
+    if (
+      !parsed.title ||
+      !parsed.description ||
+      !Array.isArray(parsed.suggestions)
+    ) {
       throw new Error("AI response missing required fields");
     }
 
@@ -80,7 +92,8 @@ Respond ONLY with valid JSON in this exact format — no markdown, no wrapping t
     console.error("[AI:generate] Error:", err.message);
     return res.status(200).json({
       ..._generateFallback(req.body?.type || "LEAVE", req.body?.rawText || ""),
-      error: "AI service temporarily unavailable. Using smart suggestions instead.",
+      error:
+        "AI service temporarily unavailable. Using smart suggestions instead.",
     });
   }
 };
@@ -116,7 +129,8 @@ export const validateRequest = async (req, res) => {
 
     if (!text || text.trim().length < 10) {
       return res.status(400).json({
-        message: "Please provide the request text to validate (at least 10 characters).",
+        message:
+          "Please provide the request text to validate (at least 10 characters).",
       });
     }
 
@@ -124,7 +138,8 @@ export const validateRequest = async (req, res) => {
       return res.status(200).json(_validateFallback(text));
     }
 
-    const context = type === "CERTIFICATE" ? "certificate request" : "leave application";
+    const context =
+      type === "CERTIFICATE" ? "certificate request" : "leave application";
 
     const prompt = `You are an academic review assistant for an Indian university management system.
 
@@ -182,7 +197,10 @@ const _validateFallback = (text) => ({
     "Could not perform AI validation — check if the text is sufficiently detailed.",
     "Ensure you include specific dates and a clear reason.",
   ],
-  actionableChanges: ["Add specific dates", "Clarify your exact reason for the request"],
+  actionableChanges: [
+    "Add specific dates",
+    "Clarify your exact reason for the request",
+  ],
   suggestedRewrite: "",
 });
 
@@ -194,11 +212,18 @@ const _validateFallback = (text) => ({
  */
 export const approvalSuggestion = async (req, res) => {
   try {
-    const { reason, duration = "Not specified", userHistory, hasDocument = false } = req.body;
+    const {
+      reason,
+      duration = "Not specified",
+      userHistory,
+      hasDocument = false,
+    } = req.body;
 
     // We allow short reasons if they provide a document
     if (!reason && !hasDocument) {
-      return res.status(400).json({ message: "Reason or Document is required." });
+      return res
+        .status(400)
+        .json({ message: "Reason or Document is required." });
     }
 
     if (!process.env.GEMINI_API_KEY) {
@@ -359,8 +384,8 @@ const _fraudFallback = (stats) => {
       risk === "Low"
         ? "Normal request frequency."
         : risk === "Medium"
-        ? "Moderately frequent requests. Manual review recommended."
-        : "High number of requests detected. Immediate review recommended.",
+          ? "Moderately frequent requests. Manual review recommended."
+          : "High number of requests detected. Immediate review recommended.",
     stats,
   };
 };
@@ -391,7 +416,7 @@ export const systemInsights = async (req, res) => {
     let matchStage = {};
     if (role !== "Super Admin" && dept) {
       // Dept Admin: only their branch
-      matchStage = {};  // join-based filtering omitted for speed — use all data
+      matchStage = {}; // join-based filtering omitted for speed — use all data
     }
 
     const [currentLeaves, prevLeaves, pendingCerts] = await Promise.all([
@@ -444,7 +469,9 @@ export const systemInsights = async (req, res) => {
       pendingLeaves: statusMap.pending || 0,
       approvedLeaves: statusMap.approved || 0,
       rejectedLeaves: statusMap.rejected || 0,
-      frequentApplicants: frequentApplicants.map((a) => `${a.name} (${a.count} requests)`),
+      frequentApplicants: frequentApplicants.map(
+        (a) => `${a.name} (${a.count} requests)`,
+      ),
     };
 
     if (!process.env.GEMINI_API_KEY) {
@@ -478,7 +505,8 @@ Rules:
 
     const parsed = await callGemini(prompt);
 
-    if (!Array.isArray(parsed.trends)) throw new Error("Invalid insights format");
+    if (!Array.isArray(parsed.trends))
+      throw new Error("Invalid insights format");
 
     return res.status(200).json({
       trends: parsed.trends || [],
@@ -507,7 +535,9 @@ const _insightsFallback = (data) => ({
   ],
   alerts:
     data.pendingCertificates > 3
-      ? [`${data.pendingCertificates} certificate requests are pending approval.`]
+      ? [
+          `${data.pendingCertificates} certificate requests are pending approval.`,
+        ]
       : [],
   suggestions: [
     "Review frequently submitted leave requests to ensure policy compliance.",
