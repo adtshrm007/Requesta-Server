@@ -15,6 +15,7 @@ The Requesta backend utilizes a hardened **MERN architecture (MongoDB, Express, 
 | **JWT & bcryptjs** | Industry-standard security. bcrypt hashes passwords with salt, and JSON Web Tokens ensure stateless, un-forgeable HTTP authorization capabilities. |
 | **Multer + Cloudinary** | Cloud object storage synchronization. `multer-storage-cloudinary` intercepts multi-part form data uploads directly in the Express route and pipes files to Cloudinary seamlessly. |
 | **Nodemailer + Resend** | Email automation. Dispatches branded HTML emails immediately upon registration, password resets (OTPs), or status updates to a user's request. |
+| **Google Gemini AI SDK**| AI integration. The backend `AI.controller.js` parses complex requests using strictly structured JSON prompts to generate analytics and text validation for the Requesta UI. |
 
 ---
 
@@ -39,6 +40,7 @@ server/Requesta-Server/
 ├── controllers/        # Business Logic (The "C" in MVC)
 │   ├── Admin.controller.js     # Does the heavy lifting. Aggregates analytics, registers admins.
 │   ├── Leave.controller.js     # Executes the "Forward", "Approve", "Reject" logic.
+│   ├── AI.controller.js        # Powers the intelligent Generation, Validation, and Insights routing.
 ├── services/           # Reusable functional blocks (e.g., custom workflow engines)
 ├── templates/          # React-esque raw HTML strings injected into emails via Nodemailer
 └── server.js           # Server instantiator, MongoDB bootstrapper, and global error catcher.
@@ -78,6 +80,15 @@ Inside `Admin.controller.js`, the platform checks `req.user.role` (which was app
 
 ---
 
+## 🧠 AI Integration & Advanced Prompts
+
+The Requesta backend manages all interactions with Google Gemini via `AI.controller.js`. Instead of letting the AI output raw, unformatted responses, the controller enforces rigid schemas and contextual restrictions:
+1. **System Insights Pipeline:** `GET /system-insights` evaluates real-time MongoDB metrics (total leaves, rejections, active certificates, and frequent applicants) and injects this data into the AI prompt to produce highly accurate, localized observations.
+2. **Approval Context Filtering:** The payload sent from the frontend is evaluated locally on the server. The AI explicitly examines the `hasDocument` boolean payload; if a student attaches a medical proxy via Cloudinary, the backend instructs the AI to rate the Request safely for Approval, bypassing text-length rules.
+3. **Structured Fallbacks:** Should the Gemini service time out or the `GEMINI_API_KEY` be missing, the backend degrades gracefully, returning a localized JSON structure that continues to provide standard advice to the frontend components.
+
+---
+
 ## 🛠️ Environment Variables Config (`.env`)
 
 Before running the server, you must have a `.env` file populated at the root of the server directory:
@@ -93,6 +104,7 @@ Before running the server, you must have a `.env` file populated at the root of 
 | `CLOUDINARY_API_SECRET`| Cloudinary secure secret |
 | `EMAIL` | System email address sending SMTP requests |
 | `PASSWORD` | System app-password for SMTP server authentication |
+| `GEMINI_API_KEY` | Google Generative AI key for enabling AI features in Requesta |
 
 ---
 
