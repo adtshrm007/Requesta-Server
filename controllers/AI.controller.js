@@ -290,16 +290,26 @@ STRICT REQUIREMENTS:
 - No generic AI fluff.
 - Identify bottlenecks (e.g., "Dept A has Y pending requests").
 - Actionable suggestions for a ${role}.
+- IMPORTANT: ALL items in "trends", "alerts", and "suggestions" MUST be simple strings. DO NOT return objects.
 
 RETURN JSON:
 {
-  "trends": [],
-  "alerts": [],
-  "suggestions": []
+  "trends": ["string"],
+  "alerts": ["string"],
+  "suggestions": ["string"]
 }
 `;
 
-    const aiResponse = await callAIWithFallback(prompt);
+    const aiRaw = await callAIWithFallback(prompt);
+
+    // 🛡️ Safety check: Ensure no objects leak into the arrays (prevents React Error #31)
+    const sanitize = (arr) => (Array.isArray(arr) ? arr.map(item => (typeof item === 'object' ? JSON.stringify(item) : String(item))) : []);
+    
+    const aiResponse = {
+      trends: sanitize(aiRaw.trends),
+      alerts: sanitize(aiRaw.alerts),
+      suggestions: sanitize(aiRaw.suggestions)
+    };
 
     return res.json({
       ...aiResponse,
