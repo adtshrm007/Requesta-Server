@@ -47,26 +47,55 @@ export const generateRequest = async (req, res) => {
     const context =
       type === "CERTIFICATE" ? "certificate request" : "leave application";
 
-    const prompt = `You are an intelligent Academic Assistant specialized in extracting details and generating professional documentation.
+    const prompt = `
+You are a strict academic writing assistant.
 
-User Input: "${rawText}"
+Your task is to CONVERT casual student input into a formal ${context}.
 
-Task:
-1. Extract structured data: Reason, Start Date, End Date, and Duration (if mentioned).
-2. Rewrite the casual input into a highly professional ${context} statement.
+=====================
+INPUT:
+"${rawText}"
+=====================
 
-Rules for Generation:
-- DO NOT copy the source text directly. 
-- REFRAME the reason using formal vocabulary (e.g., 'fever' -> 'acute health concerns').
-- SUBJECT: Generate a detailed, professional subject line (min 1 robust paragraph). Clearly mention the core reason and the duration/dates.
-- BODY: Generate ONLY the formal explanation/reasoning. DO NOT include greetings (like "Dear Authority") or closings (like "Sincerely"). Just the core content.
-- TONE: Professional, respectful, and direct.
+STRICT INSTRUCTIONS:
+- DO NOT copy or reuse the input sentence structure
+- You MUST expand the input into a formal and detailed request
+- You MUST infer missing details intelligently
+- Use formal academic language
 
-Respond ONLY with valid JSON in this exact format:
+OUTPUT REQUIREMENTS:
+
+Return ONLY valid JSON in this format:
+
 {
-  "subject": "...",
-  "body": "..."
-}`;
+  "subject": "A clear, professional subject line mentioning reason and duration",
+  "body": "A formal paragraph explaining the request in detail"
+}
+
+WRITING RULES:
+- SUBJECT must NOT be a sentence copy of input
+- BODY must be at least 4–6 lines
+- Expand short inputs (e.g., 'sister wedding') into full explanation
+- Replace informal words:
+  - 'leave' → 'leave of absence'
+  - 'sick' → 'medical condition'
+  - 'family function' → 'family obligation'
+
+=====================
+EXAMPLE:
+
+Input: "2 days leave for sister wedding"
+
+Output:
+{
+  "subject": "Request for Leave of Absence to Attend Family Wedding Ceremony",
+  "body": "I would like to formally request leave of absence for two days in order to attend my sister's wedding ceremony, which is a significant family occasion requiring my presence. I kindly request you to grant me leave for the mentioned duration."
+}
+
+=====================
+
+Now generate the response.
+`;
 
     const parsed = await callGemini(prompt);
 
@@ -88,7 +117,10 @@ Respond ONLY with valid JSON in this exact format:
 };
 
 const _generateFallback = (type, rawText) => ({
-  subject: type === "CERTIFICATE" ? `Request for ${rawText || "Certificate"} Issuance` : `Application for Leave: ${rawText || "Personal Reasons"}`,
+  subject:
+    type === "CERTIFICATE"
+      ? `Request for ${rawText || "Certificate"} Issuance`
+      : `Application for Leave: ${rawText || "Personal Reasons"}`,
   body: `I am writing to formally request a ${type.toLowerCase()} regarding "${rawText || "my previous discussion"}". This request is necessitated by operational requirements and I would appreciate your support in processing it at your earliest convenience.`,
 });
 
