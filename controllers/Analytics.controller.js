@@ -193,7 +193,7 @@ export const getAdvancedAnalytics = async (req, res) => {
             as: "studentInfo",
           },
         },
-        { $unwind: "$studentInfo" },
+        { $unwind: { path: "$studentInfo", preserveNullAndEmpty: true } },
         { $match: { "studentInfo.branch": dept } },
       ];
     };
@@ -289,15 +289,15 @@ export const getAdvancedAnalytics = async (req, res) => {
       { $sort: { "_id.month": 1 } },
     ]);
 
-    const monthMap = {};
     monthlyTrend.forEach(({ _id, count }) => {
-      if (!monthMap[_id.month]) {
-        monthMap[_id.month] = { month: _id.month, approved: 0, rejected: 0, pending: 0, forwarded: 0 };
+      const mKey = String(_id.month || "Unknown");
+      if (!monthMap[mKey]) {
+        monthMap[mKey] = { month: mKey, approved: 0, rejected: 0, pending: 0, forwarded: 0 };
       }
       if (_id.status) {
-        const statusKey = _id.status.toLowerCase();
-        if (monthMap[_id.month].hasOwnProperty(statusKey)) {
-          monthMap[_id.month][statusKey] = count;
+        const statusKey = String(_id.status).toLowerCase();
+        if (monthMap[mKey].hasOwnProperty(statusKey)) {
+          monthMap[mKey][statusKey] = count;
         }
       }
     });
