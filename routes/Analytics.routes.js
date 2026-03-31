@@ -1,3 +1,4 @@
+import express from "express";
 import { getSummary, getAdvancedAnalytics, getDecisionIntelligence } from "../controllers/Analytics.controller.js";
 import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 import { VerifyRole } from "../middleware/VerifyRole.js";
