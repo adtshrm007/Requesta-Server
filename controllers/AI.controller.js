@@ -60,31 +60,38 @@ Output:
 
 export const validateRequest = async (req, res) => {
   try {
-    const { subject, reason, hasDocument = false } = req.body;
+    const { subject, reason, hasDocument = false, type = "LEAVE" } = req.body;
 
     const prompt = `
-Validate this request.
+As a Strict Administrative Reviewer for an institutional portal, validate this ${type} request.
 
 Subject: "${subject}"
 Reason: "${reason}"
-Document: ${hasDocument ? "YES" : "NO"}
+Supporting Document Attached: ${hasDocument ? "YES" : "NO"}
 
-Return JSON:
+CRITICAL EVALUATION:
+1. CONSISTENCY: Does the "Reason" logically and professionally justify the "Subject"? Fix any mismatches.
+2. QUALITY: Ensure the tone is formal and the information is sufficient for an administrator.
+3. DOCUMENTATION: 
+   - If Document is NO: If the request is health-related, sensitive, or requires proof (e.g., Medical Leave, Bonafide Proof), you MUST suggest adding a specific supporting document in the "suggestions" array.
+   - If Document is YES: Acknowledge that the documentation helps verify the request.
+
+Return STRICT JSON:
 {
   "validity": "Valid | Needs Improvement | Suspicious",
-  "issues": [],
-  "suggestions": [],
+  "issues": ["list of items identified, e.g., 'Weak justification', 'Missing medical proof'"],
+  "suggestions": ["actionable steps, e.g., 'Attach a scanned copy of your medical certificate'"],
   "improvedVersion": {
-    "subject": "",
-    "reason": ""
+    "subject": "Professional improvement of the subject",
+    "reason": "Professional improvement of the reason/body"
   }
 }
 `;
 
     const parsed = await callAIWithFallback(prompt);
-
     return res.json(parsed);
-  } catch {
+  } catch (err) {
+    console.error("[validateRequest] Error:", err.message);
     return res.json(_validateFallback(req.body.reason));
   }
 };
@@ -325,3 +332,32 @@ RETURN JSON:
     });
   }
 };
+
+// ── Fallback Helpers (Internal) ──────────────────────────────────────────────
+
+const _generateFallback = (type, rawText) => ({
+  subject: `${type === "CERTIFICATE" ? "Request for Certificate" : "Leave Application"} - ${rawText.slice(0, 20)}...`,
+  body: `I am writing to formally submit a request regarding: ${rawText}. Please consider this application for approval.`,
+  error: "AI Assistant is currently offline. Providing basic formalization."
+});
+
+const _validateFallback = (reason) => ({
+  validity: reason.length > 20 ? "Valid" : "Needs Improvement",
+  issues: reason.length <= 20 ? ["Reason is too short for formal review."] : [],
+  suggestions: ["Ensure all mandatory fields are filled accurately."],
+  improvedVersion: {
+    subject: "Consolidated Request",
+    reason: reason
+  }
+});
+
+const _approvalFallback = () => ({
+  decision: "Review",
+  confidence: "Low",
+  reasoning: "AI engine is unavailable. Manual administrator review required."
+});
+
+const _fraudFallback = () => ({
+  riskLevel: "Medium",
+  flagReason: "Automated analysis bypassed due to high system load."
+});
