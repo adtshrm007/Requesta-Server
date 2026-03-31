@@ -180,165 +180,72 @@ Return JSON:
 
 
 /**
- * @description REDESIGNED: Data-First System Insights
- * Computes REAL role-based analytics and uses AI exclusively for interpretation.
+ * @description Intelligence Layer: Interprets raw analytics into actionable insights.
  */
 export const systemInsights = async (req, res) => {
   try {
     const { role, department } = req.user;
-    const isSuperAdmin = role === "Super Admin";
-    const adminDeptMatch = isSuperAdmin ? {} : { department: department };
+    const { stats } = req.body; // Expecting the raw data from the Data Layer
 
-    // ── 1. AGGREGATION PIPELINES ─────────────────────────────────────────────
-    
-    // A. Leave Type Distribution (Faculty/Admin)
-    const leaveTypeDist = await LeaveAdminModel.aggregate([
-      { $match: adminDeptMatch },
-      { $group: { _id: "$type", count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
+    if (!stats) {
+      return res.status(400).json({ message: "No data provided for AI interpretation." });
+    }
 
-    // B. Student vs Faculty Distribution (Volume)
-    // For students, we filter by branch (department) via lookup
-    const studentVol = await LeaveModel.aggregate([
-      {
-        $lookup: {
-          from: "studentregisters",
-          localField: "studentId",
-          foreignField: "_id",
-          as: "studentInfo"
-        }
-      },
-      { $unwind: "$studentInfo" },
-      { $match: isSuperAdmin ? {} : { "studentInfo.branch": department } },
-      { $count: "total" }
-    ]);
-
-    const facultyVol = await LeaveAdminModel.countDocuments(adminDeptMatch);
-
-    // C. Department-wise Leave Counts (Branch Distribution)
-    const branchDist = await LeaveModel.aggregate([
-      {
-        $lookup: {
-          from: "studentregisters",
-          localField: "studentId",
-          foreignField: "_id",
-          as: "studentInfo"
-        }
-      },
-      { $unwind: "$studentInfo" },
-      { $match: isSuperAdmin ? {} : { "studentInfo.branch": department } },
-      { $group: { _id: "$studentInfo.branch", count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
-
-    // D. Certificate Request Trends
-    const certTrends = await Certificate.aggregate([
-      {
-        $lookup: {
-          from: "studentregisters",
-          localField: "student",
-          foreignField: "_id",
-          as: "studentInfo"
-        }
-      },
-      { $unwind: "$studentInfo" },
-      { $match: isSuperAdmin ? {} : { "studentInfo.branch": department } },
-      { $group: { _id: "$CertificateType", count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
-
-    // E. Approval vs Rejection Rates
-    const [studentStatus, facultyStatus] = await Promise.all([
-      LeaveModel.aggregate([
-        {
-          $lookup: { from: "studentregisters", localField: "studentId", foreignField: "_id", as: "si" }
-        },
-        { $unwind: "$si" },
-        { $match: isSuperAdmin ? {} : { "si.branch": department } },
-        { $group: { _id: "$status", count: { $sum: 1 } } }
-      ]),
-      LeaveAdminModel.aggregate([
-        { $match: adminDeptMatch },
-        { $group: { _id: "$status", count: { $sum: 1 } } }
-      ])
-    ]);
-
-    // F. Average Leave Duration (Faculty)
-    const avgDuration = await LeaveAdminModel.aggregate([
-      { $match: adminDeptMatch },
-      {
-        $project: {
-          duration: {
-            $divide: [
-              { $subtract: ["$toDate", "$fromDate"] },
-              1000 * 60 * 60 * 24 // Convert ms to days
-            ]
-          }
-        }
-      },
-      { $group: { _id: null, avgDays: { $avg: "$duration" } } }
-    ]);
-
-    // ── 2. PREPARE DATA FOR AI ───────────────────────────────────────────────
-    const stats = {
-      role,
-      department: department || "All",
-      totalStudentLeaves: studentVol[0]?.total || 0,
-      totalFacultyLeaves: facultyVol,
-      leaveTypeDistribution: leaveTypeDist,
-      branchDistribution: branchDist,
-      certificateTrends: certTrends,
-      statusBreakdown: {
-        students: studentStatus,
-        faculty: facultyStatus
-      },
-      averageFacultyDuration: avgDuration[0]?.avgDays?.toFixed(1) || 0,
-      timestamp: new Date().toISOString()
+    const rolePrompts = {
+      "Faculty": `
+        Focus on: Personal efficiency, response time bottlenecks, and student request patterns. 
+        Alert if: Pending requests are older than 48h or if certain students have high frequency.
+      `,
+      "Departmental Admin": `
+        Focus on: Departmental throughput, faculty leaderboard performance, and common request categories.
+        Alert if: Rejection rate is > 30% or if any faculty is slower than the department average.
+      `,
+      "Super Admin": `
+        Focus on: Institution-wide growth, departmental overhead, resource allocation, and security anomalies.
+        Alert if: There are unauthorized access attempts or if a department is significantly delayed.
+      `
     };
 
-    // ── 3. AI INTERPRETATION LAYER ───────────────────────────────────────────
     const prompt = `
-Analyze institutional request metrics for a ${role} in ${department || "the entire system"}.
-DATA: ${JSON.stringify(stats)}
-
-STRICT REQUIREMENTS:
-- Reference actual numbers (e.g., "Medical leaves represent X%").
-- No generic AI fluff.
-- Identify bottlenecks (e.g., "Dept A has Y pending requests").
-- Actionable suggestions for a ${role}.
-- IMPORTANT: ALL items in "trends", "alerts", and "suggestions" MUST be simple strings. DO NOT return objects.
-
-RETURN JSON:
-{
-  "trends": ["string"],
-  "alerts": ["string"],
-  "suggestions": ["string"]
-}
-`;
+      You are an Executive Decision Intelligence Strategist for a premium educational institution.
+      
+      ROLE: ${role}
+      DEPARTMENT: ${department || "Institution-Wide"}
+      RAW METRICS: ${JSON.stringify(stats)}
+      
+      SPECIFIC FOCUS FOR THIS ROLE:
+      ${rolePrompts[role] || "General institutional efficiency and data-backed trends."}
+      
+      STRICT RULES:
+      1. NO GENERIC STATEMENTS. Every insight MUST reference a number, percentage, or specific category from the data.
+      2. TRENDS: Identify logical patterns (e.g., "Medical leaves increased by 12% in the last 7 days").
+      3. ALERTS: Identify urgent issues or anomalies (e.g., "3 Faculty members have avg response times exceeding 48 hours").
+      4. SUGGESTIONS: Provide actionable, strategic advice (e.g., "Reallocate staff to Dept A to handle the 25% volume spike").
+      5. Include any Security Anomalies if present in Super Admin data.
+      
+      RETURN STRICT JSON:
+      {
+        "trends": ["string"],
+        "alerts": ["string"],
+        "suggestions": ["string"]
+      }
+    `;
 
     const aiRaw = await callAIWithFallback(prompt);
 
-    // 🛡️ Safety check: Ensure no objects leak into the arrays (prevents React Error #31)
-    const sanitize = (arr) => (Array.isArray(arr) ? arr.map(item => (typeof item === 'object' ? JSON.stringify(item) : String(item))) : []);
-    
-    const aiResponse = {
-      trends: sanitize(aiRaw.trends),
-      alerts: sanitize(aiRaw.alerts),
-      suggestions: sanitize(aiRaw.suggestions)
-    };
+    const sanitize = (arr) => (Array.isArray(arr) ? arr.filter(i => typeof i === "string").map(s => s.trim()) : []);
 
     return res.json({
-      ...aiResponse,
-      stats,
+      trends: sanitize(aiRaw.trends),
+      alerts: sanitize(aiRaw.alerts),
+      suggestions: sanitize(aiRaw.suggestions),
     });
   } catch (err) {
-    console.error("[systemInsights] Redesign Error:", err);
+    console.error("[systemInsights] Intelligence Error:", err);
     return res.json({
-      trends: ["Data analysis currently unavailable."],
-      alerts: ["System is experiencing high load during aggregation."],
-      suggestions: ["Try again in a few minutes."],
-      stats: { error: true }
+      trends: ["Data interpretation temporarily offline."],
+      alerts: ["Security/Performance monitoring active (Internal)."],
+      suggestions: ["Check raw metrics or retry insights in 2 minutes."]
     });
   }
 };

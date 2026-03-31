@@ -1,10 +1,10 @@
-import express from "express";
-import { getSummary, getAdvancedAnalytics } from "../controllers/Analytics.controller.js";
+import { getSummary, getAdvancedAnalytics, getDecisionIntelligence } from "../controllers/Analytics.controller.js";
 import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 import { VerifyRole } from "../middleware/VerifyRole.js";
 
 const router = express.Router();
 
+const anyAdmin = VerifyRole(["Departmental Admin", "Super Admin", "Faculty"]);
 const deptAndSuperAdmin = VerifyRole(["Departmental Admin", "Super Admin"]);
 
 /**
@@ -18,5 +18,11 @@ router.get("/summary", verifyAccessToken1, deptAndSuperAdmin, getSummary);
  * Extended stats: frequent applicants, reason categories, monthly trends, dept breakdown
  */
 router.get("/advanced", verifyAccessToken1, deptAndSuperAdmin, getAdvancedAnalytics);
+
+/**
+ * GET /api/analytics/decision-intelligence
+ * Production-ready data layer for Decision Intelligence
+ */
+router.get("/decision-intelligence", verifyAccessToken1, anyAdmin, getDecisionIntelligence);
 
 export default router;

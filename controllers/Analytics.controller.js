@@ -348,3 +348,170 @@ export const getAdvancedAnalytics = async (req, res) => {
     });
   }
 };
+/**
+ * GET /api/analytics/decision-intelligence
+ * Production-level data layer providing role-based metrics.
+ */
+export const getDecisionIntelligence = async (req, res) => {
+  try {
+    const { timeRange = "30d" } = req.query;
+    const { id, role, department } = req.user;
+    const isSuperAdmin = role === "Super Admin";
+    const isDeptAdmin = role === "Departmental Admin";
+    const isFaculty = role === "Faculty";
+
+    const now = new Date();
+    const rangeDate = timeRange === "30d" 
+      ? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) 
+      : new Date(0); // All time
+
+    const baseMatch = { createdAt: { $gte: rangeDate } };
+
+    let results = { role, timeRange, data: {} };
+
+    // ── 1. FACULTY LAYER ──────────────────────────────────────────────────
+    if (isFaculty) {
+      const logs = await AuditLog.aggregate([
+        { $match: { performedBy: id, ...baseMatch } },
+        {
+          $group: {
+            _id: "$action",
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const handled = { approved: 0, rejected: 0, forwarded: 0 };
+      logs.forEach((l) => {
+        const key = l._id.split("_")[1]?.toLowerCase();
+        if (handled.hasOwnProperty(key)) handled[key] = l.count;
+      });
+
+      // Average Response Time for this Faculty
+      const responseTime = await AuditLog.aggregate([
+        { $match: { performedBy: id, ...baseMatch } },
+        {
+          $group: {
+            _id: "$requestId",
+            created: { $min: { $cond: [{ $eq: ["$action", "REQUEST_CREATED"] }, "$createdAt", null] } },
+            resolved: { $max: { $cond: [{ $in: ["$action", ["REQUEST_APPROVED", "REQUEST_REJECTED", "REQUEST_FORWARDED"]] }, "$createdAt", null] } },
+          },
+        },
+        { $project: { duration: { $subtract: ["$resolved", "$created"] } } },
+        { $match: { duration: { $gt: 0 } } },
+        { $group: { _id: null, avg: { $avg: "$duration" } } },
+      ]);
+
+      // Student-wise distribution
+      const studentDist = await LeaveModel.aggregate([
+        { $match: { ...baseMatch, $or: [{ studentId: id }, { approvedBy: id }] } },
+        { $group: { _id: "$studentId", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+      ]);
+
+      results.data = {
+        handled,
+        avgResponseTimeHours: responseTime[0]?.avg ? (responseTime[0].avg / (1000 * 60 * 60)).toFixed(1) : 0,
+        studentDistribution: studentDist,
+      };
+    }
+
+    // ── 2. DEPARTMENT ADMIN LAYER ─────────────────────────────────────────
+    if (isDeptAdmin || isSuperAdmin) {
+      const deptMatch = isSuperAdmin ? {} : { department: department };
+      
+      // Faculty Performance (Leaderboard)
+      const facultyPerformance = await AuditLog.aggregate([
+        { $match: { ...baseMatch, role: "Faculty" } },
+        {
+          $lookup: {
+            from: "adminregisters",
+            localField: "performedBy",
+            foreignField: "_id",
+            as: "adminInfo",
+          },
+        },
+        { $unwind: "$adminInfo" },
+        { $match: isSuperAdmin ? {} : { "adminInfo.department": department } },
+        {
+          $group: {
+            _id: "$performedBy",
+            name: { $first: "$performedByName" },
+            branch: { $first: "$adminInfo.department" },
+            processed: { $sum: 1 },
+            approved: { $sum: { $cond: [{ $eq: ["$action", "REQUEST_APPROVED"] }, 1, 0] } },
+          },
+        },
+        { $sort: { processed: -1 } },
+      ]);
+
+      // Most Common Leave Reasons (Categorized)
+      const commonReasons = await LeaveModel.aggregate([
+        {
+          $lookup: {
+            from: "studentregisters",
+            localField: "studentId",
+            foreignField: "_id",
+            as: "si",
+          },
+        },
+        { $unwind: "$si" },
+        { $match: { ...baseMatch, ...(isSuperAdmin ? {} : { "si.branch": department }) } },
+        { $group: { _id: "$Reason", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+      ]);
+
+      if (isDeptAdmin) {
+        results.data = {
+          facultyPerformance,
+          commonReasons,
+          totalDeptVolume: facultyPerformance.reduce((acc, curr) => acc + curr.processed, 0),
+        };
+      }
+    }
+
+    // ── 3. SUPER ADMIN LAYER ──────────────────────────────────────────────
+    if (isSuperAdmin) {
+      // Department Comparison
+      const deptComparison = await LeaveModel.aggregate([
+        { $match: baseMatch },
+        {
+          $lookup: {
+            from: "studentregisters",
+            localField: "studentId",
+            foreignField: "_id",
+            as: "si",
+          },
+        },
+        { $unwind: "$si" },
+        {
+          $group: {
+            _id: "$si.branch",
+            total: { $sum: 1 },
+            approved: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } },
+          },
+        },
+      ]);
+
+      // Security Anomalies (Unauthorized Access)
+      const securityAlerts = await AuditLog.countDocuments({
+        action: { $in: ["UNAUTHORIZED_ACCESS", "SYSTEM_DENIED"] },
+        ...baseMatch,
+      });
+
+      results.data = {
+        ...results.data,
+        deptComparison,
+        securityAlerts,
+        institutionGrowth: deptComparison.reduce((acc, curr) => acc + curr.total, 0),
+      };
+    }
+
+    return res.status(200).json(results);
+  } catch (err) {
+    console.error("[getDecisionIntelligence] Error:", err);
+    return res.status(500).json({ message: "Analytics Error", error: err.message });
+  }
+};

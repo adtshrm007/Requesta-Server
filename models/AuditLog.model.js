@@ -19,6 +19,8 @@ const AuditLogSchema = new Schema(
         "REQUEST_FORWARDED",
         "REQUEST_APPROVED",
         "REQUEST_REJECTED",
+        "UNAUTHORIZED_ACCESS",
+        "SYSTEM_DENIED",
       ],
       required: true,
     },
