@@ -179,9 +179,28 @@ export const getAdvancedAnalytics = async (req, res) => {
     const isSuperAdmin = role === "Super Admin";
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
 
-    // ── Top 5 Frequent Applicants (last 30 days) ──────────────────────────
+    // ── Helper: Branch Match Pipeline ─────────────────────────────────────────
+    const getBranchMatch = (studentField) => {
+      if (isSuperAdmin) return [];
+      return [
+        {
+          $lookup: {
+            from: "studentregisters",
+            localField: studentField,
+            foreignField: "_id",
+            as: "studentInfo",
+          },
+        },
+        { $unwind: "$studentInfo" },
+        { $match: { "studentInfo.branch": dept } },
+      ];
+    };
+
+    // ── 1. Top 5 Frequent Applicants (last 30 days) ──────────────────────────
     const frequentApplicants = await LeaveModel.aggregate([
+      ...getBranchMatch("studentId"),
       { $match: { createdAt: { $gte: thirtyDaysAgo } } },
       { $group: { _id: "$studentId", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
@@ -205,68 +224,43 @@ export const getAdvancedAnalytics = async (req, res) => {
       },
     ]);
 
-    // ── Most Common Leave Reasons (keyword extraction via aggregation) ─────
-    // Extract first 3 words from each reason for grouping pattern
+    // ── 2. Most Common Leave Reasons (keyword extraction via aggregation) ─────
     const reasonGroups = await LeaveModel.aggregate([
+      ...getBranchMatch("studentId"),
       { $match: { createdAt: { $gte: thirtyDaysAgo } } },
       {
         $addFields: {
-          // Classify reason into buckets
+          // 🛡️ Safety Check: Prevent crash if Reason is null or not a string
+          safeReason: { $toLower: { $ifNull: ["$Reason", ""] } }
+        }
+      },
+      {
+        $addFields: {
           category: {
             $switch: {
               branches: [
                 {
-                  case: {
-                    $regexMatch: {
-                      input: { $toLower: "$Reason" },
-                      regex: "medical|health|sick|hospital|fever|ill|doctor|surgery|treatment",
-                    },
-                  },
+                  case: { $regexMatch: { input: "$safeReason", regex: "medical|health|sick|hospital|fever|ill|doctor|surgery|treatment" } },
                   then: "Medical / Health",
                 },
                 {
-                  case: {
-                    $regexMatch: {
-                      input: { $toLower: "$Reason" },
-                      regex: "family|relative|marriage|wedding|death|funeral|emergency",
-                    },
-                  },
+                  case: { $regexMatch: { input: "$safeReason", regex: "family|relative|marriage|wedding|death|funeral|emergency" } },
                   then: "Family Emergency",
                 },
                 {
-                  case: {
-                    $regexMatch: {
-                      input: { $toLower: "$Reason" },
-                      regex: "exam|study|test|assignment|project|submission|academic",
-                    },
-                  },
+                  case: { $regexMatch: { input: "$safeReason", regex: "exam|study|test|assignment|project|submission|academic" } },
                   then: "Academic",
                 },
                 {
-                  case: {
-                    $regexMatch: {
-                      input: { $toLower: "$Reason" },
-                      regex: "travel|trip|tour|station|native|hometown|outstation",
-                    },
-                  },
+                  case: { $regexMatch: { input: "$safeReason", regex: "travel|trip|tour|station|native|hometown|outstation" } },
                   then: "Travel",
                 },
                 {
-                  case: {
-                    $regexMatch: {
-                      input: { $toLower: "$Reason" },
-                      regex: "festival|holiday|celebration|puja|eid|diwali|christmas",
-                    },
-                  },
+                  case: { $regexMatch: { input: "$safeReason", regex: "festival|holiday|celebration|puja|eid|diwali|christmas" } },
                   then: "Festival / Holiday",
                 },
                 {
-                  case: {
-                    $regexMatch: {
-                      input: { $toLower: "$Reason" },
-                      regex: "internship|placement|interview|job|company|corporate",
-                    },
-                  },
+                  case: { $regexMatch: { input: "$safeReason", regex: "internship|placement|interview|job|company|corporate" } },
                   then: "Placement / Internship",
                 },
               ],
@@ -279,14 +273,14 @@ export const getAdvancedAnalytics = async (req, res) => {
       { $sort: { count: -1 } },
     ]);
 
-    // ── Approval Trend by Month (last 6 months) ────────────────────────────
-    const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
+    // ── 3. Approval Trend by Month (last 6 months) ────────────────────────────
     const monthlyTrend = await LeaveModel.aggregate([
+      ...getBranchMatch("studentId"),
       { $match: { createdAt: { $gte: sixMonthsAgo } } },
       {
         $group: {
           _id: {
-            month: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+            month: { $dateToString: { format: "%Y-%m", date: { $ifNull: ["$createdAt", new Date()] } } },
             status: "$status",
           },
           count: { $sum: 1 },
@@ -295,17 +289,20 @@ export const getAdvancedAnalytics = async (req, res) => {
       { $sort: { "_id.month": 1 } },
     ]);
 
-    // Reshape monthly trend into chart-friendly format
     const monthMap = {};
     monthlyTrend.forEach(({ _id, count }) => {
       if (!monthMap[_id.month]) {
         monthMap[_id.month] = { month: _id.month, approved: 0, rejected: 0, pending: 0, forwarded: 0 };
       }
-      if (_id.status) monthMap[_id.month][_id.status.toLowerCase()] = count;
+      if (_id.status) {
+        const statusKey = _id.status.toLowerCase();
+        if (monthMap[_id.month].hasOwnProperty(statusKey)) {
+          monthMap[_id.month][statusKey] = count;
+        }
+      }
     });
-    const monthlyData = Object.values(monthMap);
 
-    // ── Department-wise Distribution (for Super Admin) ────────────────────
+    // ── 4. Department-wise Distribution (for Super Admin only) ────────────────
     let deptDistribution = [];
     if (isSuperAdmin) {
       deptDistribution = await LeaveModel.aggregate([
@@ -329,8 +326,9 @@ export const getAdvancedAnalytics = async (req, res) => {
       ]);
     }
 
-    // ── Certificate by Type ───────────────────────────────────────────────
+    // ── 5. Certificate by Type (with isolation) ──────────────────────────────
     const certByType = await Certificate.aggregate([
+      ...getBranchMatch("student"),
       { $group: { _id: "$CertificateType", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
@@ -338,12 +336,15 @@ export const getAdvancedAnalytics = async (req, res) => {
     return res.status(200).json({
       frequentApplicants,
       leaveReasons: reasonGroups.map(({ _id, count }) => ({ reason: _id, count })),
-      monthlyTrend: monthlyData,
+      monthlyTrend: Object.values(monthMap),
       deptDistribution,
       certByType: certByType.map(({ _id, count }) => ({ type: _id || "Other", count })),
     });
   } catch (err) {
-    console.error("[Analytics:advanced] Error:", err);
-    return res.status(500).json({ message: "Server error", error: err.message });
+    console.error("[Analytics:advanced] Logic Error:", err);
+    return res.status(500).json({ 
+      message: "Server error during data aggregation", 
+      error: err.message 
+    });
   }
 };
