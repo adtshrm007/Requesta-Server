@@ -99,27 +99,37 @@ Return STRICT JSON:
 
 export const approvalSuggestion = async (req, res) => {
   try {
-    const { reason, duration, hasDocument } = req.body;
+    const { reason, duration, hasDocument, type = "LEAVE" } = req.body;
 
     const prompt = `
-Decide approval.
+As an Expert Institutional Administrative Assistant, analyze this ${type} request and advise the administrator.
 
-Reason: "${reason}"
+Request Details:
+Type: ${type}
+Reason/Description: "${reason}"
 Duration: ${duration}
-Document: ${hasDocument ? "YES" : "NO"}
+Supporting Document Attached: ${hasDocument ? "YES" : "NO"}
 
-Return JSON:
+STRICT ADMINISTRATIVE RULES:
+1. DOCUMENTATION:
+   - If Type is CERTIFICATE and Sub-type is Bonafide/Character/Transfer and Document is NO: You MUST suggest REJECT and the Remark must ask for a Student ID Card or relevant proof.
+   - If Type is LEAVE and Duration > 3 days and Document is NO: You MUST suggest REJECT and ask for a Medical/Official Certificate.
+2. REASONING: Explain clearly to the ADMIN why this request should be approved or rejected.
+3. SUGGESTED REMARK: Provide a professional, ready-to-copy message for the STUDENT.
+
+Return STRICT JSON:
 {
   "decision": "Approve | Reject | Review",
   "confidence": "High | Medium | Low",
-  "reasoning": ""
+  "reasoning": "Detailed logical explanation for the administrator",
+  "suggestedRemark": "A professional, polite, and direct message for the student explaining the decision or requirement"
 }
 `;
 
     const parsed = await callAIWithFallback(prompt);
-
     return res.json(parsed);
-  } catch {
+  } catch (err) {
+    console.error("[approvalSuggestion] Error:", err.message);
     return res.json(_approvalFallback());
   }
 };
@@ -354,7 +364,8 @@ const _validateFallback = (reason) => ({
 const _approvalFallback = () => ({
   decision: "Review",
   confidence: "Low",
-  reasoning: "AI engine is unavailable. Manual administrator review required."
+  reasoning: "AI engine is unavailable. Manual administrator review required.",
+  suggestedRemark: "Please contact the administration office regarding your application."
 });
 
 const _fraudFallback = () => ({
