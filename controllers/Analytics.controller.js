@@ -3,6 +3,7 @@ import LeaveAdminModel from "../models/LeaveAdmins.model.js";
 import Certificate from "../models/certificate.model.js";
 import AuditLog from "../models/AuditLog.model.js";
 import studentRegister from "../models/studentRegister.model.js";
+import mongoose from "mongoose";
 
 /**
  * GET /api/analytics/summary
@@ -366,13 +367,14 @@ export const getDecisionIntelligence = async (req, res) => {
       : new Date(0); // All time
 
     const baseMatch = { createdAt: { $gte: rangeDate } };
+    const objId = new mongoose.Types.ObjectId(id);
 
     let results = { role, timeRange, data: {} };
 
     // ── 1. FACULTY LAYER ──────────────────────────────────────────────────
     if (isFaculty) {
       const logs = await AuditLog.aggregate([
-        { $match: { performedBy: id, ...baseMatch } },
+        { $match: { performedBy: objId, ...baseMatch } },
         {
           $group: {
             _id: "$action",
@@ -389,7 +391,7 @@ export const getDecisionIntelligence = async (req, res) => {
 
       // Average Response Time for this Faculty
       const responseTime = await AuditLog.aggregate([
-        { $match: { performedBy: id, ...baseMatch } },
+        { $match: { performedBy: objId, ...baseMatch } },
         {
           $group: {
             _id: "$requestId",
@@ -404,7 +406,7 @@ export const getDecisionIntelligence = async (req, res) => {
 
       // Student-wise distribution
       const studentDist = await LeaveModel.aggregate([
-        { $match: { ...baseMatch, $or: [{ studentId: id }, { approvedBy: id }] } },
+        { $match: { ...baseMatch, $or: [{ studentId: objId }, { approvedBy: objId }] } },
         { $group: { _id: "$studentId", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 5 },
