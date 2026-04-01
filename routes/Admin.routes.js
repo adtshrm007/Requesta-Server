@@ -19,7 +19,7 @@ import { VerifyRole } from "../middleware/VerifyRole.js";
 
 const router = express.Router();
 
-router.post("/register", registerAdmin);
+router.post("/register", verifyAccessToken1, registerAdmin);
 router.post("/get", getAdminById);
 router.post("/otp", sendOTP);
 router.post("/email", loginAdminUsingEmail);

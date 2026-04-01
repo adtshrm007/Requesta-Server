@@ -9,8 +9,37 @@ import OTPAdmin from "../models/OTPAdmin.model.js";
 import { mailTemplate } from "../templates/ForgotPassword.template.js";
 
 export const registerAdmin = async (req, res) => {
-  try{
+  try {
+    const { role: requesterRole, department: requesterDept } = req.user;
     const { adminID, password, name, email, department, role } = req.body;
+
+    // ── 1. Role-Based Validation ──────────────────────────────────────────
+    if (requesterRole === "Super Admin") {
+      // Super Admin can only add Departmental Admins
+      if (role !== "Departmental Admin") {
+        return res.status(403).json({
+          message: "Super Admin can only register Departmental Admins.",
+        });
+      }
+    } else if (requesterRole === "Departmental Admin") {
+      // Dept Admin can only add Faculty to their own department
+      if (role !== "Faculty") {
+        return res.status(403).json({
+          message: "Departmental Admin can only register Faculty members.",
+        });
+      }
+      if (department !== requesterDept) {
+        return res.status(403).json({
+          message: `You can only register Faculty for the ${requesterDept} department.`,
+        });
+      }
+    } else {
+      // Faculty or other roles cannot register anyone
+      return res.status(403).json({
+        message: "You are not authorized to register new administrators.",
+      });
+    }
+
     const existing = await AdminRegister.findOne({
       $or: [{ adminID: req.body.adminID }, { email: req.body.email }],
     });
