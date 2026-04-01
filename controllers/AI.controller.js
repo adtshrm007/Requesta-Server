@@ -60,49 +60,71 @@ Output:
 
 export const validateRequest = async (req, res) => {
   try {
-    const { subject, reason, hasDocument = false, type = "LEAVE" } = req.body;
+    const { 
+      subject, 
+      reason, 
+      hasDocument = false, 
+      type = "LEAVE", 
+      startDate = null, 
+      endDate = null,
+      userHistory = { pastLeaves: 0, recentLeaves: 0, rejections: 0 }
+    } = req.body;
 
     const prompt = `
-As a STRICT Institutional Portal Validator, analyze this ${type} request and provide a final decision.
-Focus: Subject, Reason, Tone, and Document Requirements.
+As a STRICT POLICY-DRIVEN DECISION ENGINE for an institutional portal, audit this ${type} request and provide a final verdict.
+This is NOT a chatbot. Every decision MUST be based on institutional rules and logical reasoning.
 
 INPUT:
 Subject: "${subject}"
 Reason: "${reason}"
-Document Provided: ${hasDocument ? "YES" : "NO"}
+Document Attached: ${hasDocument ? "YES" : "NO"}
+Dates: ${startDate} to ${endDate}
+Student History: ${userHistory.pastLeaves} past leaves, ${userHistory.recentLeaves} recent (30 days), ${userHistory.rejections} rejections.
 
-VALIDATION RULES:
-1. LEAVE TYPE DETECTION (Identify as: Medical, Casual, Emergency, Academic, or Other).
-2. DOCUMENT REQUIREMENTS:
-   - If LEAVE TYPE is Medical: Document is REQUIRED.
-   - If LEAVE is > 3 days (extract from text): Document is REQUIRED.
-   - If LEAVE TYPE is Emergency: Document is OPTIONAL (but Recommended).
-   - If LEAVE TYPE is Casual: Document is NOT required.
-3. QUALITY ANALYSIS:
-   - Check if subject is professional and descriptive (min 4-5 words).
-   - Check if reason is specific, formal, and clear.
-   - Flag vague phrases like "some work", "personal work", or "sick" without details.
+DECISION LOGIC:
+1. SUBJECT AUDIT: Must be professional, detailed (min 1 paragraph if formal). Generic subjects like "Leave Application" are POOR QUALITY.
+2. REASON AUDIT: Reject vague phrases ("personal work", "not feeling well"). Must be specific and formal.
+3. TYPE DETECTION: (Medical, Casual, Emergency, Academic, or Other).
+4. DURATION CALCULATION: Use dates if provided. Calculate logic: Leave > 3 days requires document.
+5. DOCUMENT RULES:
+   - Medical -> REQUIRED.
+   - Duration > 3 days -> REQUIRED.
+   - Emergency -> OPTIONAL but recommended.
+   - Casual (1-2 days) -> NOT required.
+6. RISK ANALYSIS (0-100 Score):
+   - Increase risk if: vague reason (+30), missing required document (+50), frequent leaves or high rejections (+20).
+   - Rating: LOW (0-30), MEDIUM (31-70), HIGH (71-100).
+7. VERDICT (APPROVE | REVIEW | REJECT):
+   - APPROVE: Clear input + clear reason + low risk + document status OK.
+   - REVIEW: Minor issues or moderate risk.
+   - REJECT: Vague input OR missing required document OR high risk (>70).
 
-STRICT JSON OUTPUT FORMAT:
+RETURN ONLY JSON:
 {
   "decision": "APPROVE | REVIEW | REJECT",
   "confidence": number (0-100),
   "detectedType": "Medical | Casual | Emergency | Academic | Other",
-  "issues": ["list of specific failures/warnings"],
+  "duration": "number of days or null",
+  "issues": ["list of specific failures"],
   "documentAnalysis": {
     "required": true | false,
     "status": "MISSING | PROVIDED | NOT_REQUIRED",
-    "reason": "Clear explanation of why it is required or not"
+    "reason": "Explain policy logic"
   },
-  "suggestions": ["actionable improvements"],
+  "riskAnalysis": {
+    "score": number,
+    "level": "LOW | MEDIUM | HIGH",
+    "factors": ["list why score is high/low"]
+  },
+  "keyFactors": ["key positive/negative highlights"],
+  "finalSummary": "Clear verdict summary",
+  "explainDecision": ["Step-by-step reasoning logic"],
   "improvedVersion": {
     "subject": "Professional replacement for subject",
     "reason": "Professional replacement for reason"
   },
-  "finalSummary": "Final verdict explaining the logic"
+  "suggestions": ["actionable steps for the student"]
 }
-
-STRICT: No conversational filler. Use institutional terminology.
 `;
 
     const parsed = await callAIWithFallback(prompt);
@@ -279,18 +301,26 @@ const _validateFallback = (reason) => ({
   decision: reason.length > 20 ? "REVIEW" : "REJECT",
   confidence: 60,
   detectedType: "Casual",
+  duration: null,
   issues: reason.length <= 20 ? ["Reason is too short for formal review."] : [],
   documentAnalysis: {
     required: false,
     status: "NOT_REQUIRED",
     reason: "Fallback analysis cannot determine specific documentary requirements."
   },
-  suggestions: ["Ensure all mandatory fields are filled accurately."],
+  riskAnalysis: {
+    score: 50,
+    level: "MEDIUM",
+    factors: ["Manual fallback check due to AI being offline"]
+  },
+  keyFactors: ["Structural check applied"],
+  finalSummary: "AI validation is temporarily offline. Basic structural check applied.",
+  explainDecision: ["Analyzing message length", "Evaluating quality of reason"],
   improvedVersion: {
     subject: "Consolidated Request",
     reason: reason
   },
-  finalSummary: "AI validation is temporarily offline. Basic structural check applied."
+  suggestions: ["Ensure all mandatory fields are filled accurately."]
 });
 
 const _approvalFallback = () => ({
