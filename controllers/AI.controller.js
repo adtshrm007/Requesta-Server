@@ -63,29 +63,46 @@ export const validateRequest = async (req, res) => {
     const { subject, reason, hasDocument = false, type = "LEAVE" } = req.body;
 
     const prompt = `
-As a Strict Administrative Reviewer for an institutional portal, validate this ${type} request.
+As a STRICT Institutional Portal Validator, analyze this ${type} request and provide a final decision.
+Focus: Subject, Reason, Tone, and Document Requirements.
 
+INPUT:
 Subject: "${subject}"
 Reason: "${reason}"
-Supporting Document Attached: ${hasDocument ? "YES" : "NO"}
+Document Provided: ${hasDocument ? "YES" : "NO"}
 
-CRITICAL EVALUATION:
-1. CONSISTENCY: Does the "Reason" logically and professionally justify the "Subject"? Fix any mismatches.
-2. QUALITY: Ensure the tone is formal and the information is sufficient for an administrator.
-3. DOCUMENTATION: 
-   - If Document is NO: If the request is health-related, sensitive, or requires proof (e.g., Medical Leave, Bonafide Proof), you MUST suggest adding a specific supporting document in the "suggestions" array.
-   - If Document is YES: Acknowledge that the documentation helps verify the request.
+VALIDATION RULES:
+1. LEAVE TYPE DETECTION (Identify as: Medical, Casual, Emergency, Academic, or Other).
+2. DOCUMENT REQUIREMENTS:
+   - If LEAVE TYPE is Medical: Document is REQUIRED.
+   - If LEAVE is > 3 days (extract from text): Document is REQUIRED.
+   - If LEAVE TYPE is Emergency: Document is OPTIONAL (but Recommended).
+   - If LEAVE TYPE is Casual: Document is NOT required.
+3. QUALITY ANALYSIS:
+   - Check if subject is professional and descriptive (min 4-5 words).
+   - Check if reason is specific, formal, and clear.
+   - Flag vague phrases like "some work", "personal work", or "sick" without details.
 
-Return STRICT JSON:
+STRICT JSON OUTPUT FORMAT:
 {
-  "validity": "Valid | Needs Improvement | Suspicious",
-  "issues": ["list of items identified, e.g., 'Weak justification', 'Missing medical proof'"],
-  "suggestions": ["actionable steps, e.g., 'Attach a scanned copy of your medical certificate'"],
+  "decision": "APPROVE | REVIEW | REJECT",
+  "confidence": number (0-100),
+  "detectedType": "Medical | Casual | Emergency | Academic | Other",
+  "issues": ["list of specific failures/warnings"],
+  "documentAnalysis": {
+    "required": true | false,
+    "status": "MISSING | PROVIDED | NOT_REQUIRED",
+    "reason": "Clear explanation of why it is required or not"
+  },
+  "suggestions": ["actionable improvements"],
   "improvedVersion": {
-    "subject": "Professional improvement of the subject",
-    "reason": "Professional improvement of the reason/body"
-  }
+    "subject": "Professional replacement for subject",
+    "reason": "Professional replacement for reason"
+  },
+  "finalSummary": "Final verdict explaining the logic"
 }
+
+STRICT: No conversational filler. Use institutional terminology.
 `;
 
     const parsed = await callAIWithFallback(prompt);
@@ -259,13 +276,21 @@ const _generateFallback = (type, rawText) => ({
 });
 
 const _validateFallback = (reason) => ({
-  validity: reason.length > 20 ? "Valid" : "Needs Improvement",
+  decision: reason.length > 20 ? "REVIEW" : "REJECT",
+  confidence: 60,
+  detectedType: "Casual",
   issues: reason.length <= 20 ? ["Reason is too short for formal review."] : [],
+  documentAnalysis: {
+    required: false,
+    status: "NOT_REQUIRED",
+    reason: "Fallback analysis cannot determine specific documentary requirements."
+  },
   suggestions: ["Ensure all mandatory fields are filled accurately."],
   improvedVersion: {
     subject: "Consolidated Request",
     reason: reason
-  }
+  },
+  finalSummary: "AI validation is temporarily offline. Basic structural check applied."
 });
 
 const _approvalFallback = () => ({
