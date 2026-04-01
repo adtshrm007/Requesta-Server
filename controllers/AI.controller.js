@@ -191,58 +191,72 @@ export const systemInsights = async (req, res) => {
 
     const roleContexts = {
       "Faculty": `
-        ROLE: FACULTY (Academic Auditor)
-        CONTEXT: Limited to student leaves. Focus on academic integrity and instructional continuity.
-        KEY OBJECTIVES: Detect patterns of student absence and ensure leave reasons are academic or medical (with documentation).
+        ROLE: FACULTY
+        INTELLIGENCE FOCUS:
+        - Only student leave insights
+        - Most common leave types
+        - Peak leave dates
+        - Delay patterns
       `,
       "Departmental Admin": `
-        ROLE: DEPARTMENTAL ADMIN (Operations Manager)
-        CONTEXT: Reviewing both Student and Faculty behavior. 
-        KEY OBJECTIVES: Monitor departmental throughput, identify processing bottlenecks, and compare faculty leave trends with student cycles.
+        ROLE: DEPARTMENT_ADMIN
+        INTELLIGENCE FOCUS:
+        - Student + faculty comparison
+        - Approval vs rejection patterns
+        - Department-level anomalies
       `,
       "Super Admin": `
-        ROLE: SUPER ADMIN (Executive Director)
-        CONTEXT: Institution-wide strategic oversight. 
-        KEY OBJECTIVES: Certificate demand analysis, cross-department efficiency ranking, security/fraud anomaly detection, and institutional growth patterns.
+        ROLE: SUPER_ADMIN
+        INTELLIGENCE FOCUS:
+        - Institution-wide insights
+        - Certificate demand trends
+        - Average decision time
+        - Cross-department performance
+        - Admin efficiency comparison
       `
     };
 
     const prompt = `
-      You are a SENIOR DATA ANALYST + STRATEGIC DECISION ENGINE for Requesta (Institutional Workflow Platform).
-      
+      You are a DATA INTERPRETATION + DECISION INTELLIGENCE SYSTEM for Requesta, an institutional workflow platform.
+      This is NOT a chatbot. You must provide realistic, numerical, and actionable insights with mandatory "WHY" explanations.
+
       CURRENT ROLE: ${role}
       DEPARTMENT: ${department || "Institution-Wide"}
       ${roleContexts[role] || "Strategic institutional oversight."}
-      
+
       INPUT DATA (RAW AGGREGATIONS):
       ${JSON.stringify(analyticsData)}
-      
-      STRICT OPERATIONAL RULES:
-      1. REALISTIC INTERPRETATION: NEVER use "100%" unless numerically verified. Use specific, realistic percentages (e.g., 62.4%).
-      2. NUMERICAL PRECISION: EVERY trend, alert, and suggestion MUST include at least one number (count, percentage, or duration).
-      3. "WHY" EXPLANATION: Every trend MUST include a logical reasoning based on institutional cycles (e.g., "...due to mid-semester exam pressure" or "...likely seasonal illness trends").
-      4. ACTIONABLE ALERTS: Alerts must be urgent and specific (e.g., "7 requests pending > 72h").
-      5. NO REPETITION: Do not just list data. Interpret it.
-      
+
+      STRICT REALISM & INTELLIGENCE RULES:
+      1. NO generic text. NO vague insights.
+      2. REALISTIC VALUES: NEVER use extreme values like 0% or 100% unless absolutely true. Use realistic percentages (40-80%). Avoid vague statements.
+      3. NUMBERS REQUIRED: EVERY trend, alert, and suggestion MUST include numbers (count, percentage, or duration) to reflect actual data patterns.
+      4. THE "WHY" FACTOR: Every single insight MUST include reasoning. Add "WHY" to everything based on institutional cycles.
+         - Bad: "Casual leaves are high"
+         - Good: "Casual leaves account for 52%, likely due to increased personal commitments during this period"
+      5. SYSTEM ALERTS (URGENT + ACTIONABLE): Alerts must indicate the problem clearly, include numbers, and state urgency (e.g., "7 requests pending for more than 72 hours (SLA breach)", "Rejection rate increased by 25% this week"). Avoid generic alerts.
+      6. ACTIONABLE STRATEGY: Suggestions must directly relate to data and be practically implementable (e.g., "Introduce a 48-hour SLA to reduce pending requests").
+      7. ROLE ADAPTATION: STRICTLY adapt outputs based on the ROLE defined above.
+
       FINAL OUTPUT FORMAT (STRICT JSON ONLY):
       {
         "executiveSummary": {
           "systemHealth": "GOOD | MODERATE | CRITICAL",
-          "summary": "2-3 lines explaining the overall state of operations.",
-          "keyRisk": "Single biggest anomaly or operational risk.",
-          "immediateAction": "The most important strategic step to take now."
+          "summary": "2-3 lines explaining system condition, must reflect actual data patterns and include numbers.",
+          "keyRisk": "Most critical issue identified.",
+          "immediateAction": "What should be done right now."
         },
-        "trends": ["Format: Number/Stat + Insight + WHY Explanation"],
-        "alerts": ["Format: High-priority numerical alert + Action required"],
-        "suggestions": ["Specific, data-backed strategic recommendation"],
+        "trends": ["Format: Insight + Number/Stat + WHY Reasoning"],
+        "alerts": ["Format: High-priority numerical alert + Urgency + Explanation"],
+        "suggestions": ["Specific, data-backed practical recommendation"],
         "advancedAnalytics": {
           "topLeaveReasons": [{"reason": "string", "count": number}],
-          "averageDecisionTime": "string (numerical, e.g. 15.4h)",
+          "averageDecisionTime": "string (in days or hours)",
           "approvalRate": "string (percentage)",
           "rejectionRate": "string (percentage)",
           "peakDates": [{"date": "string", "requests": number}],
-          "adminPerformance": [{"admin": "string", "avgTime": "string"}],
-          "anomalies": ["Nuanced numerical anomalies detected"]
+          "adminPerformance": [{"admin": "string", "avgTime": "string", "approvalRate": "string"}],
+          "anomalies": ["Nuanced numerical and analytical anomalies"]
         }
       }
     `;

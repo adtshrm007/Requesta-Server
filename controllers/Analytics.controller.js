@@ -351,7 +351,7 @@ export const getAdvancedAnalytics = async (req, res) => {
 };
 /**
  * GET /api/analytics/decision-intelligence
- * Production-level data layer providing role-based metrics.
+ * Production-level data layer providing role-based metrics for the AI Engine.
  */
 export const getDecisionIntelligence = async (req, res) => {
   try {
@@ -367,151 +367,183 @@ export const getDecisionIntelligence = async (req, res) => {
       : new Date(0); // All time
 
     const baseMatch = { createdAt: { $gte: rangeDate } };
-    const objId = new mongoose.Types.ObjectId(id);
+    
+    // ── 1. Aggregation Pipelines ───────────────────────────────────────────
+    
+    // Helper: Match by Department if not Super Admin
+    const getDeptMatch = () => {
+      if (isSuperAdmin) return {};
+      return { "si.branch": department };
+    };
 
-    let results = { role, timeRange, data: {} };
-
-    // ── 1. FACULTY LAYER ──────────────────────────────────────────────────
-    if (isFaculty) {
-      const logs = await AuditLog.aggregate([
-        { $match: { performedBy: objId, ...baseMatch } },
-        {
-          $group: {
-            _id: "$action",
-            count: { $sum: 1 },
-          },
+    // a. Leave Requests (Recent Summary)
+    const leaveRequests = await LeaveModel.aggregate([
+      { $match: baseMatch },
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "si",
         },
-      ]);
+      },
+      { $unwind: "$si" },
+      { $match: getDeptMatch() },
+      { $sort: { createdAt: -1 } },
+      { $limit: 10 },
+      { $project: { type: 1, status: 1, Reason: 1, createdAt: 1, days: 1 } }
+    ]);
 
-      const handled = { approved: 0, rejected: 0, forwarded: 0 };
-      logs.forEach((l) => {
-        const key = l._id.split("_")[1]?.toLowerCase();
-        if (handled.hasOwnProperty(key)) handled[key] = l.count;
-      });
-
-      // Average Response Time for this Faculty
-      const responseTime = await AuditLog.aggregate([
-        { $match: { performedBy: objId, ...baseMatch } },
-        {
-          $group: {
-            _id: "$requestId",
-            created: { $min: { $cond: [{ $eq: ["$action", "REQUEST_CREATED"] }, "$createdAt", null] } },
-            resolved: { $max: { $cond: [{ $in: ["$action", ["REQUEST_APPROVED", "REQUEST_REJECTED", "REQUEST_FORWARDED"]] }, "$createdAt", null] } },
-          },
+    // b. Certificate Requests (Recent Summary)
+    const certificateRequests = await Certificate.aggregate([
+      { $match: baseMatch },
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "student",
+          foreignField: "_id",
+          as: "si",
         },
-        { $project: { duration: { $subtract: ["$resolved", "$created"] } } },
-        { $match: { duration: { $gt: 0 } } },
-        { $group: { _id: null, avg: { $avg: "$duration" } } },
-      ]);
+      },
+      { $unwind: "$si" },
+      { $match: getDeptMatch() },
+      { $sort: { createdAt: -1 } },
+      { $limit: 10 },
+      { $project: { CertificateType: 1, status: 1, purpose: 1, createdAt: 1 } }
+    ]);
 
-      // Student-wise distribution
-      const studentDist = await LeaveModel.aggregate([
-        { $match: { ...baseMatch, $or: [{ studentId: objId }, { approvedBy: objId }] } },
-        { $group: { _id: "$studentId", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 5 },
-      ]);
-
-      results.data = {
-        handled,
-        avgResponseTimeHours: responseTime[0]?.avg ? (responseTime[0].avg / (1000 * 60 * 60)).toFixed(1) : 0,
-        studentDistribution: studentDist,
-      };
-    }
-
-    // ── 2. DEPARTMENT ADMIN LAYER ─────────────────────────────────────────
-    if (isDeptAdmin || isSuperAdmin) {
-      const deptMatch = isSuperAdmin ? {} : { department: department };
-      
-      // Faculty Performance (Leaderboard)
-      const facultyPerformance = await AuditLog.aggregate([
-        { $match: { ...baseMatch, role: "Faculty" } },
-        {
-          $lookup: {
-            from: "adminregisters",
-            localField: "performedBy",
-            foreignField: "_id",
-            as: "adminInfo",
-          },
+    // c. Approval Stats
+    const approvalStatsAgg = await LeaveModel.aggregate([
+      { $match: baseMatch },
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "si",
         },
-        { $unwind: "$adminInfo" },
-        { $match: isSuperAdmin ? {} : { "adminInfo.department": department } },
-        {
-          $group: {
-            _id: "$performedBy",
-            name: { $first: "$performedByName" },
-            branch: { $first: "$adminInfo.department" },
-            processed: { $sum: 1 },
-            approved: { $sum: { $cond: [{ $eq: ["$action", "REQUEST_APPROVED"] }, 1, 0] } },
-          },
-        },
-        { $sort: { processed: -1 } },
-      ]);
+      },
+      { $unwind: "$si" },
+      { $match: getDeptMatch() },
+      { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
 
-      // Most Common Leave Reasons (Categorized)
-      const commonReasons = await LeaveModel.aggregate([
-        {
-          $lookup: {
-            from: "studentregisters",
-            localField: "studentId",
-            foreignField: "_id",
-            as: "si",
-          },
-        },
-        { $unwind: "$si" },
-        { $match: { ...baseMatch, ...(isSuperAdmin ? {} : { "si.branch": department }) } },
-        { $group: { _id: "$Reason", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 5 },
-      ]);
+    const approvalStats = { approved: 0, rejected: 0, pending: 0 };
+    approvalStatsAgg.forEach(s => {
+      if (s._id === "approved") approvalStats.approved = s.count;
+      if (s._id === "rejected") approvalStats.rejected = s.count;
+      if (s._id === "pending") approvalStats.pending = s.count;
+    });
 
-      if (isDeptAdmin) {
-        results.data = {
-          facultyPerformance,
-          commonReasons,
-          totalDeptVolume: facultyPerformance.reduce((acc, curr) => acc + curr.processed, 0),
-        };
+    // d. Requests By Date (30-day time series)
+    const requestsByDate = await LeaveModel.aggregate([
+      { $match: baseMatch },
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "si",
+        },
+      },
+      { $unwind: "$si" },
+      { $match: getDeptMatch() },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          requests: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // e. Leave Types & Top Reasons
+    const leaveTypesAgg = await LeaveModel.aggregate([
+      { $match: baseMatch },
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "si",
+        },
+      },
+      { $unwind: "$si" },
+      { $match: getDeptMatch() },
+      { $group: { _id: "$type", count: { $sum: 1 } } }
+    ]);
+    const leaveTypes = leaveTypesAgg.map(lt => ({ type: lt._id, count: lt.count }));
+
+    const topReasons = await LeaveModel.aggregate([
+      { $match: baseMatch },
+      {
+        $lookup: {
+          from: "studentregisters",
+          localField: "studentId",
+          foreignField: "_id",
+          as: "si",
+        },
+      },
+      { $unwind: "$si" },
+      { $match: getDeptMatch() },
+      { $group: { _id: "$Reason", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+      { $project: { reason: "$_id", count: 1, _id: 0 } }
+    ]);
+
+    // f. Processing Times (Calculating SLA)
+    const processingTimesAgg = await AuditLog.aggregate([
+      { $match: baseMatch },
+      {
+        $group: {
+          _id: "$requestId",
+          created: { $min: { $cond: [{ $eq: ["$action", "REQUEST_CREATED"] }, "$createdAt", null] } },
+          resolved: { $max: { $cond: [{ $in: ["$action", ["REQUEST_APPROVED", "REQUEST_REJECTED", "REQUEST_FORWARDED"]] }, "$createdAt", null] } }
+        }
+      },
+      { $project: { duration: { $subtract: ["$resolved", "$created"] } } },
+      { $match: { duration: { $gt: 0 } } },
+      { $group: { _id: null, avg: { $avg: "$duration" } } }
+    ]);
+    const avgResponseTimeHours = processingTimesAgg[0]?.avg ? (processingTimesAgg[0].avg / (1000 * 60 * 60)).toFixed(1) : "0";
+
+    // g. Admin Actions (Performance Comparison)
+    const adminActions = await AuditLog.aggregate([
+      { $match: baseMatch },
+      {
+        $group: {
+          _id: "$performedBy",
+          admin: { $first: "$performedByName" },
+          totalActions: { $sum: 1 },
+          approvals: { $sum: { $cond: [{ $eq: ["$action", "REQUEST_APPROVED"] }, 1, 0] } },
+          rejections: { $sum: { $cond: [{ $eq: ["$action", "REQUEST_REJECTED"] }, 1, 0] } },
+        }
+      },
+      { $project: {
+          admin: 1,
+          totalActions: 1,
+          approvalRate: { $concat: [{ $toString: { $round: [{ $multiply: [{ $divide: ["$approvals", "$totalActions"] }, 100] }, 1] } }, "%"] }
+        }
       }
-    }
+    ]);
 
-    // ── 3. SUPER ADMIN LAYER ──────────────────────────────────────────────
-    if (isSuperAdmin) {
-      // Department Comparison
-      const deptComparison = await LeaveModel.aggregate([
-        { $match: baseMatch },
-        {
-          $lookup: {
-            from: "studentregisters",
-            localField: "studentId",
-            foreignField: "_id",
-            as: "si",
-          },
-        },
-        { $unwind: "$si" },
-        {
-          $group: {
-            _id: "$si.branch",
-            total: { $sum: 1 },
-            approved: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } },
-          },
-        },
-      ]);
+    // Combine everything into the user-specified INPUT structure
+    const analyticsData = {
+      role,
+      data: {
+        leaveRequests,
+        certificateRequests,
+        approvalStats,
+        requestsByDate,
+        leaveTypes,
+        topReasons,
+        processingTimes: [{ type: "LEAVE", avgTime: `${avgResponseTimeHours}h` }], // Simplified for AI interpretation
+        adminActions
+      }
+    };
 
-      // Security Anomalies (Unauthorized Access)
-      const securityAlerts = await AuditLog.countDocuments({
-        action: { $in: ["UNAUTHORIZED_ACCESS", "SYSTEM_DENIED"] },
-        ...baseMatch,
-      });
-
-      results.data = {
-        ...results.data,
-        deptComparison,
-        securityAlerts,
-        institutionGrowth: deptComparison.reduce((acc, curr) => acc + curr.total, 0),
-      };
-    }
-
-    return res.status(200).json(results);
+    return res.status(200).json({ role, timeRange, data: analyticsData });
   } catch (err) {
     console.error("[getDecisionIntelligence] Error:", err);
     return res.status(500).json({ message: "Analytics Error", error: err.message });
