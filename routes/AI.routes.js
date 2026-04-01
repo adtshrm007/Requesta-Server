@@ -84,6 +84,6 @@ router.post("/approval-suggestion", adminOnly, approvalSuggestion);
 router.get("/check-fraud", adminOnly, fraudDetection);
 
 // ── Module 7: System-level AI insights (admin only) ───────────────────────────
-router.get("/system-insights", adminOnly, systemInsights);
+router.post("/system-insights", adminOnly, systemInsights);
 
 export default router;

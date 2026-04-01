@@ -102,12 +102,12 @@ DECISION LOGIC:
 RETURN ONLY JSON:
 {
   "decision": "APPROVE | REVIEW | REJECT",
-  "confidence": number (0-100),
+  "confidence": number,
   "detectedType": "Medical | Casual | Emergency | Academic | Other",
-  "duration": "number of days or null",
+  "duration": number or null,
   "issues": ["list of specific failures"],
   "documentAnalysis": {
-    "required": true | false,
+    "required": true,
     "status": "MISSING | PROVIDED | NOT_REQUIRED",
     "reason": "Explain policy logic"
   },
@@ -118,7 +118,7 @@ RETURN ONLY JSON:
   },
   "keyFactors": ["key positive/negative highlights"],
   "finalSummary": "Clear verdict summary",
-  "explainDecision": ["Step-by-step reasoning logic"],
+  "explainDecision": ["Step 1 Reasoning", "Step 2 Reasoning", "Step 3 Reasoning"],
   "improvedVersion": {
     "subject": "Professional replacement for subject",
     "reason": "Professional replacement for reason"
@@ -141,7 +141,7 @@ export const approvalSuggestion = async (req, res) => {
     const { reason, duration, hasDocument, type = "LEAVE" } = req.body;
 
     const prompt = `
-As an Expert Institutional Administrative Assistant, analyze this ${type} request and advise the administrator.
+As an Expert Institutional Administrative Assistant and Policy Consultant, analyze this ${type} request and advise the administrator.
 
 Request Details:
 Type: ${type}
@@ -153,15 +153,17 @@ STRICT ADMINISTRATIVE RULES:
 1. DOCUMENTATION:
    - If Type is CERTIFICATE and Sub-type is Bonafide/Character/Transfer and Document is NO: You MUST suggest REJECT and the Remark must ask for a Student ID Card or relevant proof.
    - If Type is LEAVE and Duration > 3 days and Document is NO: You MUST suggest REJECT and ask for a Medical/Official Certificate.
-2. REASONING: Explain clearly to the ADMIN why this request should be approved or rejected.
-3. SUGGESTED REMARK: Provide a professional, ready-to-copy message for the STUDENT.
+2. REASONING: Explain clearly and logically to the ADMIN the "Why" behind the suggestion based on institutional policy.
+3. FUTURE GUIDANCE: Provide a suggested remark for the requester for future references (e.g. what to attach next time).
 
 Return STRICT JSON:
 {
   "decision": "Approve | Reject | Review",
   "confidence": "High | Medium | Low",
+  "policySummary": "Brief summary of the AI's understanding on why it thinks approval/rejection is needed based on institutional rules.",
   "reasoning": "Detailed logical explanation for the administrator",
-  "suggestedRemark": "A professional, polite, and direct message for the student explaining the decision or requirement"
+  "futureGuidance": "Direct advice for the student on how to improve future applications of this type.",
+  "suggestedRemark": "A professional, polite, and direct message for the student explaining the decision and guidance."
 }
 `;
 
@@ -174,99 +176,75 @@ Return STRICT JSON:
 };
 
 
-
-export const fraudDetection = async (req, res) => {
-  try {
-    const { studentId } = req.query;
-
-    const leaves = await LeaveModel.find({ studentId });
-
-    const total = leaves.length;
-
-    // ⚡ RULE-BASED (FAST + FREE)
-    if (total > 7) {
-      return res.json({
-        riskLevel: "High",
-        flagReason: "Too many leave requests",
-      });
-    }
-
-    if (total < 2) {
-      return res.json({
-        riskLevel: "Low",
-        flagReason: "Normal behavior",
-      });
-    }
-
-    // 🤖 AI only if needed
-    const prompt = `
-Analyze leave pattern count: ${total}
-
-Return JSON:
-{
-  "riskLevel": "Low | Medium | High",
-  "flagReason": ""
-}
-`;
-
-    const parsed = await callAIWithFallback(prompt);
-
-    return res.json(parsed);
-  } catch {
-    return res.json(_fraudFallback({}));
-  }
-};
-
-
 /**
  * @description Intelligence Layer: Interprets raw analytics into actionable insights.
+ * Upgraded into a Role-Based Decision Intelligence Engine.
  */
 export const systemInsights = async (req, res) => {
   try {
     const { role, department } = req.user;
-    const { stats } = req.body; // Expecting the raw data from the Data Layer
+    const { analyticsData } = req.body; // Parts 2: Precomputed MongoDB aggregations
 
-    if (!stats) {
-      return res.status(400).json({ message: "No data provided for AI interpretation." });
+    if (!analyticsData) {
+      return res.status(400).json({ message: "No analytics data provided for AI interpretation." });
     }
 
     const rolePrompts = {
       "Faculty": `
-        Focus on: Personal efficiency, response time bottlenecks, and student request patterns. 
-        Alert if: Pending requests are older than 48h or if certain students have high frequency.
+        ROLE: FACULTY (Limited to student leaves)
+        Insights must include:
+        - Most common leave types among students in this data.
+        - Dates with highest leave frequency.
+        - Pending delays or specific student patterns.
       `,
       "Departmental Admin": `
-        Focus on: Departmental throughput, faculty leaderboard performance, and common request categories.
-        Alert if: Rejection rate is > 30% or if any faculty is slower than the department average.
+        ROLE: DEPARTMENT ADMIN
+        Insights must include:
+        - Student + Faculty leave trends within the department.
+        - Comparison between student and faculty behavior.
+        - Peak leave periods for the department.
+        - Department-level anomalies (e.g., high rejection rate, slow processing).
       `,
       "Super Admin": `
-        Focus on: Institution-wide growth, departmental overhead, resource allocation, and security anomalies.
-        Alert if: There are unauthorized access attempts or if a department is significantly delayed.
+        ROLE: SUPER ADMIN
+        Insights must include:
+        - Institution-wide trends and growth.
+        - Certificate demand trends (most requested certificates).
+        - Average decision time (approval/rejection) system-wide.
+        - Department performance comparison.
+        - Admin behavior analysis (efficiency/delays).
+        - System-level inefficiencies or security anomalies.
       `
     };
 
     const prompt = `
-      You are an Executive Decision Intelligence Strategist for a premium educational institution.
+      You are an Executive Decision Intelligence Strategist for a premium educational institution (Requesta).
       
       ROLE: ${role}
       DEPARTMENT: ${department || "Institution-Wide"}
-      RAW METRICS: ${JSON.stringify(stats)}
+      RAW ANALYTICS DATA (JSON): ${JSON.stringify(analyticsData)}
       
       SPECIFIC FOCUS FOR THIS ROLE:
       ${rolePrompts[role] || "General institutional efficiency and data-backed trends."}
       
       STRICT RULES:
       1. NO GENERIC STATEMENTS. Every insight MUST reference a number, percentage, or specific category from the data.
-      2. TRENDS: Identify logical patterns (e.g., "Medical leaves increased by 12% in the last 7 days").
-      3. ALERTS: Identify urgent issues or anomalies (e.g., "3 Faculty members have avg response times exceeding 48 hours").
-      4. SUGGESTIONS: Provide actionable, strategic advice (e.g., "Reallocate staff to Dept A to handle the 25% volume spike").
-      5. Include any Security Anomalies if present in Super Admin data.
+      2. TRENDS: Identify logical patterns (e.g., "Medical leaves increased by 12%").
+      3. ALERTS: Identify urgent issues or anomalies (e.g., "3 Faculty have avg response times over 72h").
+      4. SUGGESTIONS: Provide actionable, strategic advice.
+      5. ADVANCED ANALYTICS: Extract Top 3 reasons, Average decision time, Peak dates, and Admin performance comparison.
       
-      RETURN STRICT JSON:
+      RETURN ONLY JSON:
       {
         "trends": ["string"],
         "alerts": ["string"],
-        "suggestions": ["string"]
+        "suggestions": ["string"],
+        "advancedAnalytics": {
+          "topLeaveReasons": [{"reason": "string", "count": number}],
+          "averageDecisionTime": "string (e.g. 2.4 days)",
+          "peakDates": [{"date": "string", "requests": number}],
+          "adminPerformance": [{"admin": "string", "avgTime": "string"}]
+        }
       }
     `;
 
@@ -278,13 +256,15 @@ export const systemInsights = async (req, res) => {
       trends: sanitize(aiRaw.trends),
       alerts: sanitize(aiRaw.alerts),
       suggestions: sanitize(aiRaw.suggestions),
+      advancedAnalytics: aiRaw.advancedAnalytics || {}
     });
   } catch (err) {
-    console.error("[systemInsights] Intelligence Error:", err);
+    console.error("[getAIInsights] Intelligence Error:", err);
     return res.json({
       trends: ["Data interpretation temporarily offline."],
       alerts: ["Security/Performance monitoring active (Internal)."],
-      suggestions: ["Check raw metrics or retry insights in 2 minutes."]
+      suggestions: ["Check raw metrics or retry insights in 2 minutes."],
+      advancedAnalytics: {}
     });
   }
 };
