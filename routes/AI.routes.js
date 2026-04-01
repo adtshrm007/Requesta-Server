@@ -3,7 +3,6 @@ import {
   generateRequest,
   validateRequest,
   approvalSuggestion,
-  fraudDetection,
   systemInsights,
 } from "../controllers/AI.controller.js";
 import { verifyAccessToken } from "../middleware/authStudent.middleware.js";
@@ -80,8 +79,6 @@ router.post("/validate-request", dualAuth, validateRequest);
 // ── Module 3: AI approval suggestion for a specific request (admin only) ───────
 router.post("/approval-suggestion", adminOnly, approvalSuggestion);
 
-// ── Module 4: Fraud / abuse detection for a student (admin only) ───────────────
-router.get("/check-fraud", adminOnly, fraudDetection);
 
 // ── Module 7: System-level AI insights (admin only) ───────────────────────────
 router.post("/system-insights", adminOnly, systemInsights);
