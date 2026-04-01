@@ -183,81 +183,87 @@ Return STRICT JSON:
 export const systemInsights = async (req, res) => {
   try {
     const { role, department } = req.user;
-    const { analyticsData } = req.body; // Parts 2: Precomputed MongoDB aggregations
+    const { analyticsData } = req.body; 
 
     if (!analyticsData) {
       return res.status(400).json({ message: "No analytics data provided for AI interpretation." });
     }
 
-    const rolePrompts = {
+    const roleContexts = {
       "Faculty": `
-        ROLE: FACULTY (Limited to student leaves)
-        Insights must include:
-        - Most common leave types among students in this data.
-        - Dates with highest leave frequency.
-        - Pending delays or specific student patterns.
+        ROLE: FACULTY (Academic Auditor)
+        CONTEXT: Limited to student leaves. Focus on academic integrity and instructional continuity.
+        KEY OBJECTIVES: Detect patterns of student absence and ensure leave reasons are academic or medical (with documentation).
       `,
       "Departmental Admin": `
-        ROLE: DEPARTMENT ADMIN
-        Insights must include:
-        - Student + Faculty leave trends within the department.
-        - Comparison between student and faculty behavior.
-        - Peak leave periods for the department.
-        - Department-level anomalies (e.g., high rejection rate, slow processing).
+        ROLE: DEPARTMENTAL ADMIN (Operations Manager)
+        CONTEXT: Reviewing both Student and Faculty behavior. 
+        KEY OBJECTIVES: Monitor departmental throughput, identify processing bottlenecks, and compare faculty leave trends with student cycles.
       `,
       "Super Admin": `
-        ROLE: SUPER ADMIN
-        Insights must include:
-        - Institution-wide trends and growth.
-        - Certificate demand trends (most requested certificates).
-        - Average decision time (approval/rejection) system-wide.
-        - Department performance comparison.
-        - Admin behavior analysis (efficiency/delays).
-        - System-level inefficiencies or security anomalies.
+        ROLE: SUPER ADMIN (Executive Director)
+        CONTEXT: Institution-wide strategic oversight. 
+        KEY OBJECTIVES: Certificate demand analysis, cross-department efficiency ranking, security/fraud anomaly detection, and institutional growth patterns.
       `
     };
 
     const prompt = `
-      You are an Executive Decision Intelligence Strategist for a premium educational institution (Requesta).
+      You are a SENIOR DATA ANALYST + STRATEGIC DECISION ENGINE for Requesta (Institutional Workflow Platform).
       
-      ROLE: ${role}
+      CURRENT ROLE: ${role}
       DEPARTMENT: ${department || "Institution-Wide"}
-      RAW ANALYTICS DATA (JSON): ${JSON.stringify(analyticsData)}
+      ${roleContexts[role] || "Strategic institutional oversight."}
       
-      SPECIFIC FOCUS FOR THIS ROLE:
-      ${rolePrompts[role] || "General institutional efficiency and data-backed trends."}
+      INPUT DATA (RAW AGGREGATIONS):
+      ${JSON.stringify(analyticsData)}
       
-      STRICT RULES:
-      1. NO GENERIC STATEMENTS. Every insight MUST reference a number, percentage, or specific category from the data.
-      2. TRENDS: Identify logical patterns (e.g., "Medical leaves increased by 12%").
-      3. ALERTS: Identify urgent issues or anomalies (e.g., "3 Faculty have avg response times over 72h").
-      4. SUGGESTIONS: Provide actionable, strategic advice.
-      5. ADVANCED ANALYTICS: Extract Top 3 reasons, Average decision time, Peak dates, and Admin performance comparison.
+      STRICT OPERATIONAL RULES:
+      1. REALISTIC INTERPRETATION: NEVER use "100%" unless numerically verified. Use specific, realistic percentages (e.g., 62.4%).
+      2. NUMERICAL PRECISION: EVERY trend, alert, and suggestion MUST include at least one number (count, percentage, or duration).
+      3. "WHY" EXPLANATION: Every trend MUST include a logical reasoning based on institutional cycles (e.g., "...due to mid-semester exam pressure" or "...likely seasonal illness trends").
+      4. ACTIONABLE ALERTS: Alerts must be urgent and specific (e.g., "7 requests pending > 72h").
+      5. NO REPETITION: Do not just list data. Interpret it.
       
-      RETURN ONLY JSON:
+      FINAL OUTPUT FORMAT (STRICT JSON ONLY):
       {
-        "trends": ["string"],
-        "alerts": ["string"],
-        "suggestions": ["string"],
+        "executiveSummary": {
+          "systemHealth": "GOOD | MODERATE | CRITICAL",
+          "summary": "2-3 lines explaining the overall state of operations.",
+          "keyRisk": "Single biggest anomaly or operational risk.",
+          "immediateAction": "The most important strategic step to take now."
+        },
+        "trends": ["Format: Number/Stat + Insight + WHY Explanation"],
+        "alerts": ["Format: High-priority numerical alert + Action required"],
+        "suggestions": ["Specific, data-backed strategic recommendation"],
         "advancedAnalytics": {
           "topLeaveReasons": [{"reason": "string", "count": number}],
-          "averageDecisionTime": "string (e.g. 2.4 days)",
+          "averageDecisionTime": "string (numerical, e.g. 15.4h)",
+          "approvalRate": "string (percentage)",
+          "rejectionRate": "string (percentage)",
           "peakDates": [{"date": "string", "requests": number}],
-          "adminPerformance": [{"admin": "string", "avgTime": "string"}]
+          "adminPerformance": [{"admin": "string", "avgTime": "string"}],
+          "anomalies": ["Nuanced numerical anomalies detected"]
         }
       }
     `;
 
     const aiRaw = await callAIWithFallback(prompt);
 
-    const sanitize = (arr) => (Array.isArray(arr) ? arr.filter(i => typeof i === "string").map(s => s.trim()) : []);
-
-    return res.json({
-      trends: sanitize(aiRaw.trends),
-      alerts: sanitize(aiRaw.alerts),
-      suggestions: sanitize(aiRaw.suggestions),
+    // Ensure all critical fields exist for frontend stability
+    const finalInsights = {
+      executiveSummary: aiRaw.executiveSummary || {
+        systemHealth: "MODERATE",
+        summary: "Intelligence engine initializing...",
+        keyRisk: "Limited historical data",
+        immediateAction: "Continue monitoring request volume"
+      },
+      trends: Array.isArray(aiRaw.trends) ? aiRaw.trends : [],
+      alerts: Array.isArray(aiRaw.alerts) ? aiRaw.alerts : [],
+      suggestions: Array.isArray(aiRaw.suggestions) ? aiRaw.suggestions : [],
       advancedAnalytics: aiRaw.advancedAnalytics || {}
-    });
+    };
+
+    return res.json(finalInsights);
   } catch (err) {
     console.error("[getAIInsights] Intelligence Error:", err);
     return res.json({
