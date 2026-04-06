@@ -3,7 +3,16 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization — don't crash on startup if key is missing
+let _resend = null;
+const getResend = () => {
+  if (!_resend) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) throw new Error("RESEND_API_KEY environment variable is not set.");
+    _resend = new Resend(key);
+  }
+  return _resend;
+};
 
 /**
  * Unified sendMail wrapper — drop-in replacement for nodemailer transport.sendMail()
@@ -11,6 +20,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
  */
 export const transport = {
   sendMail: async ({ from, to, subject, text, html }) => {
+    const resend = getResend();
     const result = await resend.emails.send({
       from: from || `Requesta Portal <onboarding@resend.dev>`,
       to: Array.isArray(to) ? to : [to],
@@ -28,8 +38,8 @@ export const transport = {
   },
 };
 
-console.log(
-  process.env.RESEND_API_KEY
-    ? "✅ Resend: API key loaded — email service ready"
-    : "❌ Resend: RESEND_API_KEY missing — emails will fail"
-);
+if (!process.env.RESEND_API_KEY) {
+  console.warn("⚠️  Resend: RESEND_API_KEY not set — emails will fail until this is added to Render env vars");
+} else {
+  console.log("✅ Resend: API key loaded — email service ready");
+}
