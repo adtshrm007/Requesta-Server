@@ -194,7 +194,7 @@ export const getAdvancedAnalytics = async (req, res) => {
             as: "studentInfo",
           },
         },
-        { $unwind: { path: "$studentInfo", preserveNullAndEmpty: true } },
+        { $unwind: { path: "$studentInfo", preserveNullAndEmptyArrays: true } },
         { $match: { "studentInfo.branch": dept } },
       ];
     };
@@ -562,167 +562,195 @@ export const getLeaveInsightsData = async (req, res) => {
     const isSuperAdmin = role === "Super Admin";
 
     const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    // Helper: Branch Match Pipeline
-    const getBranchMatch = (studentField) => {
+    // Helper: Department scoping pipeline for student leaves
+    const getDeptPipeline = () => {
       if (isSuperAdmin) return [];
       return [
         {
           $lookup: {
             from: "studentregisters",
-            localField: studentField,
+            localField: "studentId",
             foreignField: "_id",
             as: "studentInfo",
           },
         },
-        { $unwind: { path: "$studentInfo", preserveNullAndEmpty: true } },
+        { $unwind: "$studentInfo" },
         { $match: { "studentInfo.branch": department } },
       ];
     };
 
     // ── 1. Top Leave Reasons (categorized) ──────────────────────────────────
-    const reasonGroups = await LeaveModel.aggregate([
-      ...getBranchMatch("studentId"),
-      {
-        $addFields: {
-          safeReason: { $toLower: { $ifNull: ["$Reason", ""] } }
-        }
-      },
-      {
-        $addFields: {
-          category: {
-            $switch: {
-              branches: [
-                { case: { $regexMatch: { input: "$safeReason", regex: "medical|health|sick|hospital|fever|ill|doctor|surgery|treatment" } }, then: "Medical / Health" },
-                { case: { $regexMatch: { input: "$safeReason", regex: "family|relative|marriage|wedding|death|funeral|emergency" } }, then: "Family Emergency" },
-                { case: { $regexMatch: { input: "$safeReason", regex: "exam|study|test|assignment|project|submission|academic" } }, then: "Academic" },
-                { case: { $regexMatch: { input: "$safeReason", regex: "travel|trip|tour|station|native|hometown|outstation" } }, then: "Travel" },
-                { case: { $regexMatch: { input: "$safeReason", regex: "festival|holiday|celebration|puja|eid|diwali|christmas" } }, then: "Festival / Holiday" },
-                { case: { $regexMatch: { input: "$safeReason", regex: "internship|placement|interview|job|company|corporate" } }, then: "Placement / Internship" },
-                { case: { $regexMatch: { input: "$safeReason", regex: "personal|private|home" } }, then: "Personal" },
-              ],
-              default: "Other",
+    let topReasonsWithPct = [];
+    try {
+      const reasonGroups = await LeaveModel.aggregate([
+        ...getDeptPipeline(),
+        {
+          $addFields: {
+            safeReason: { $toLower: { $ifNull: ["$Reason", ""] } }
+          }
+        },
+        {
+          $addFields: {
+            category: {
+              $switch: {
+                branches: [
+                  { case: { $regexMatch: { input: "$safeReason", regex: /medical|health|sick|hospital|fever|ill|doctor|surgery|treatment/i } }, then: "Medical / Health" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /family|relative|marriage|wedding|death|funeral|emergency/i } }, then: "Family Emergency" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /exam|study|test|assignment|project|submission|academic/i } }, then: "Academic" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /travel|trip|tour|station|native|hometown|outstation/i } }, then: "Travel" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /festival|holiday|celebration|puja|eid|diwali|christmas/i } }, then: "Festival / Holiday" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /internship|placement|interview|job|company|corporate/i } }, then: "Placement / Internship" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /personal|private|home/i } }, then: "Personal" },
+                ],
+                default: "Other",
+              },
             },
           },
         },
-      },
-      { $group: { _id: "$category", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-    ]);
-
-    const topReasons = reasonGroups.map(({ _id, count }) => ({ reason: _id, count }));
-    const totalReasonCount = topReasons.reduce((s, r) => s + r.count, 0);
-    const topReasonsWithPct = topReasons.map(r => ({
-      ...r,
-      percentage: totalReasonCount > 0 ? Math.round((r.count / totalReasonCount) * 100) : 0
-    }));
-
-    // ── 2. Monthly Leave Stats (last 6 months) ──────────────────────────────
-    const monthlyAgg = await LeaveModel.aggregate([
-      ...getBranchMatch("studentId"),
-      { $match: { createdAt: { $gte: sixMonthsAgo } } },
-      {
-        $group: {
-          _id: {
-            month: { $dateToString: { format: "%Y-%m", date: { $ifNull: ["$createdAt", new Date()] } } },
-            status: "$status",
-          },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { "_id.month": 1 } },
-    ]);
-
-    const monthMap = {};
-    monthlyAgg.forEach(({ _id, count }) => {
-      const mKey = String(_id.month || "Unknown");
-      if (!monthMap[mKey]) {
-        monthMap[mKey] = { month: mKey, total: 0, approved: 0, rejected: 0, pending: 0, forwarded: 0 };
-      }
-      if (_id.status) {
-        const statusKey = String(_id.status).toLowerCase();
-        if (monthMap[mKey].hasOwnProperty(statusKey)) {
-          monthMap[mKey][statusKey] = count;
-        }
-      }
-      monthMap[mKey].total += count;
-    });
-    const monthlyStats = Object.values(monthMap);
-
-    // ── 3. Peak Leave Days (day of week) ────────────────────────────────────
-    const peakDaysAgg = await LeaveModel.aggregate([
-      ...getBranchMatch("studentId"),
-      { $match: { createdAt: { $gte: sixMonthsAgo } } },
-      {
-        $group: {
-          _id: { $dayOfWeek: { $ifNull: ["$createdAt", new Date()] } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { count: -1 } },
-    ]);
-
-    const dayNames = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const peakDays = peakDaysAgg.map(d => ({
-      day: dayNames[d._id] || `Day ${d._id}`,
-      count: d.count,
-    }));
-
-    // ── 4. Approval / Rejection Stats ───────────────────────────────────────
-    const statusAgg = await LeaveModel.aggregate([
-      ...getBranchMatch("studentId"),
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]);
-
-    const statusStats = { total: 0, approved: 0, rejected: 0, pending: 0, forwarded: 0 };
-    statusAgg.forEach(({ _id, count }) => {
-      if (_id) statusStats[_id.toLowerCase()] = count;
-      statusStats.total += count;
-    });
-    const processed = statusStats.approved + statusStats.rejected;
-    statusStats.approvalRate = processed > 0 ? Math.round((statusStats.approved / processed) * 100) : 0;
-    statusStats.rejectionRate = processed > 0 ? Math.round((statusStats.rejected / processed) * 100) : 0;
-
-    // ── 5. Student vs Admin Leave Split ──────────────────────────────────────
-    let adminLeaveCount = 0;
-    if (isSuperAdmin) {
-      const adminCount = await LeaveAdminModel.countDocuments();
-      adminLeaveCount = adminCount;
-    } else {
-      const adminCount = await LeaveAdminModel.aggregate([
-        {
-          $lookup: {
-            from: "adminregisters",
-            localField: "admin",
-            foreignField: "_id",
-            as: "adminInfo",
-          },
-        },
-        { $unwind: "$adminInfo" },
-        { $match: { "adminInfo.department": department } },
-        { $count: "total" },
+        { $group: { _id: "$category", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
       ]);
-      adminLeaveCount = adminCount[0]?.total || 0;
+
+      const topReasons = reasonGroups.map(({ _id, count }) => ({ reason: _id, count }));
+      const totalReasonCount = topReasons.reduce((s, r) => s + r.count, 0);
+      topReasonsWithPct = topReasons.map(r => ({
+        ...r,
+        percentage: totalReasonCount > 0 ? Math.round((r.count / totalReasonCount) * 100) : 0
+      }));
+    } catch (e) {
+      console.error("[leave-insights] topReasons error:", e.message);
     }
 
-    const leaveSplit = [
+    // ── 2. Monthly Leave Stats (last 6 months) ──────────────────────────────
+    let monthlyStats = [];
+    try {
+      const monthlyAgg = await LeaveModel.aggregate([
+        ...getDeptPipeline(),
+        { $match: { createdAt: { $gte: sixMonthsAgo } } },
+        {
+          $group: {
+            _id: {
+              month: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+              status: "$status",
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.month": 1 } },
+      ]);
+
+      const monthMap = {};
+      monthlyAgg.forEach(({ _id, count }) => {
+        const mKey = String(_id.month || "Unknown");
+        if (!monthMap[mKey]) {
+          monthMap[mKey] = { month: mKey, total: 0, approved: 0, rejected: 0, pending: 0, forwarded: 0 };
+        }
+        if (_id.status) {
+          const statusKey = String(_id.status).toLowerCase();
+          if (monthMap[mKey].hasOwnProperty(statusKey)) {
+            monthMap[mKey][statusKey] = count;
+          }
+        }
+        monthMap[mKey].total += count;
+      });
+      monthlyStats = Object.values(monthMap);
+    } catch (e) {
+      console.error("[leave-insights] monthlyStats error:", e.message);
+    }
+
+    // ── 3. Peak Leave Days (day of week) ────────────────────────────────────
+    let peakDays = [];
+    try {
+      const peakDaysAgg = await LeaveModel.aggregate([
+        ...getDeptPipeline(),
+        { $match: { createdAt: { $gte: sixMonthsAgo } } },
+        {
+          $group: {
+            _id: { $dayOfWeek: "$createdAt" },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { count: -1 } },
+      ]);
+
+      const dayNames = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      peakDays = peakDaysAgg.map(d => ({
+        day: dayNames[d._id] || `Day ${d._id}`,
+        count: d.count,
+      }));
+    } catch (e) {
+      console.error("[leave-insights] peakDays error:", e.message);
+    }
+
+    // ── 4. Approval / Rejection Stats ───────────────────────────────────────
+    const statusStats = { total: 0, approved: 0, rejected: 0, pending: 0, forwarded: 0, approvalRate: 0, rejectionRate: 0 };
+    try {
+      const statusAgg = await LeaveModel.aggregate([
+        ...getDeptPipeline(),
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]);
+
+      statusAgg.forEach(({ _id, count }) => {
+        if (_id) statusStats[_id.toLowerCase()] = count;
+        statusStats.total += count;
+      });
+      const processed = statusStats.approved + statusStats.rejected;
+      statusStats.approvalRate = processed > 0 ? Math.round((statusStats.approved / processed) * 100) : 0;
+      statusStats.rejectionRate = processed > 0 ? Math.round((statusStats.rejected / processed) * 100) : 0;
+    } catch (e) {
+      console.error("[leave-insights] statusStats error:", e.message);
+    }
+
+    // ── 5. Student vs Admin Leave Split ──────────────────────────────────────
+    let leaveSplit = [
       { type: "Student Leaves", count: statusStats.total },
-      { type: "Admin/Faculty Leaves", count: adminLeaveCount },
+      { type: "Admin/Faculty Leaves", count: 0 },
     ];
+    try {
+      let adminLeaveCount = 0;
+      if (isSuperAdmin) {
+        adminLeaveCount = await LeaveAdminModel.countDocuments();
+      } else {
+        const adminCount = await LeaveAdminModel.aggregate([
+          {
+            $lookup: {
+              from: "adminregisters",
+              localField: "admin",
+              foreignField: "_id",
+              as: "adminInfo",
+            },
+          },
+          { $unwind: "$adminInfo" },
+          { $match: { "adminInfo.department": department } },
+          { $count: "total" },
+        ]);
+        adminLeaveCount = adminCount[0]?.total || 0;
+      }
+      leaveSplit[1].count = adminLeaveCount;
+    } catch (e) {
+      console.error("[leave-insights] leaveSplit error:", e.message);
+    }
 
     // ── 6. Recent Leave Trend (last 30 days, daily) ─────────────────────────
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const dailyTrend = await LeaveModel.aggregate([
-      ...getBranchMatch("studentId"),
-      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          count: { $sum: 1 },
+    let dailyTrend = [];
+    try {
+      const daily = await LeaveModel.aggregate([
+        ...getDeptPipeline(),
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            count: { $sum: 1 },
+          },
         },
-      },
-      { $sort: { _id: 1 } },
-    ]);
+        { $sort: { _id: 1 } },
+      ]);
+      dailyTrend = daily.map(d => ({ date: d._id, count: d.count }));
+    } catch (e) {
+      console.error("[leave-insights] dailyTrend error:", e.message);
+    }
 
     return res.status(200).json({
       topReasons: topReasonsWithPct,
@@ -730,10 +758,11 @@ export const getLeaveInsightsData = async (req, res) => {
       peakDays,
       statusStats,
       leaveSplit,
-      dailyTrend: dailyTrend.map(d => ({ date: d._id, count: d.count })),
+      dailyTrend,
     });
   } catch (err) {
-    console.error("[Analytics:leave-insights] Error:", err);
+    console.error("[Analytics:leave-insights] Fatal Error:", err);
     return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
