@@ -1,16 +1,35 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import dotenv from "dotenv";
 
 dotenv.config();
-export const transport = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.USER_EMAIL,
-    pass: process.env.APP_PASSWORD,
-  }
-});
 
-// Verify credentials on startup
-transport.verify()
-  .then(() => console.log("✅ Nodemailer: Gmail transport verified — ready to send emails"))
-  .catch((err) => console.error("❌ Nodemailer: Gmail transport FAILED —", err.message));
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Unified sendMail wrapper — drop-in replacement for nodemailer transport.sendMail()
+ * Accepts the same { from, to, subject, text, html } shape.
+ */
+export const transport = {
+  sendMail: async ({ from, to, subject, text, html }) => {
+    const result = await resend.emails.send({
+      from: from || `Requesta Portal <onboarding@resend.dev>`,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      text,
+      html,
+    });
+
+    if (result.error) {
+      throw new Error(result.error.message || "Resend email failed");
+    }
+
+    console.log("[Email] Sent successfully | ID:", result.data?.id);
+    return { messageId: result.data?.id };
+  },
+};
+
+console.log(
+  process.env.RESEND_API_KEY
+    ? "✅ Resend: API key loaded — email service ready"
+    : "❌ Resend: RESEND_API_KEY missing — emails will fail"
+);
