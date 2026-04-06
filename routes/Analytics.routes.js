@@ -1,5 +1,5 @@
 import express from "express";
-import { getSummary, getAdvancedAnalytics, getDecisionIntelligence } from "../controllers/Analytics.controller.js";
+import { getSummary, getAdvancedAnalytics, getDecisionIntelligence, getLeaveInsightsData } from "../controllers/Analytics.controller.js";
 import { verifyAccessToken1 } from "../middleware/authAdmin.middleware.js";
 import { VerifyRole } from "../middleware/VerifyRole.js";
 
@@ -25,5 +25,11 @@ router.get("/advanced", verifyAccessToken1, deptAndSuperAdmin, getAdvancedAnalyt
  * Production-ready data layer for Decision Intelligence
  */
 router.get("/decision-intelligence", verifyAccessToken1, anyAdmin, getDecisionIntelligence);
+
+/**
+ * GET /api/analytics/leave-insights
+ * Hard data for System Insights: reasons, monthly stats, peak days, status breakdown
+ */
+router.get("/leave-insights", verifyAccessToken1, anyAdmin, getLeaveInsightsData);
 
 export default router;
