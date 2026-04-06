@@ -183,108 +183,283 @@ Return STRICT JSON:
 export const systemInsights = async (req, res) => {
   try {
     const { role, department } = req.user;
-    const { analyticsData } = req.body; 
+    const isSuperAdmin = role === "Super Admin";
+    const isDeptAdmin = role === "Departmental Admin";
 
-    if (!analyticsData) {
-      return res.status(400).json({ message: "No analytics data provided for AI interpretation." });
+    const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // ── Helper: Department scoping for student leaves ────────────────────────
+    const getStudentDeptPipeline = () => {
+      if (isSuperAdmin) return [];
+      return [
+        {
+          $lookup: {
+            from: "studentregisters",
+            localField: "studentId",
+            foreignField: "_id",
+            as: "studentInfo",
+          },
+        },
+        { $unwind: "$studentInfo" },
+        { $match: { "studentInfo.branch": department } },
+      ];
+    };
+
+    // ── 1. Student Leave Reasons (categorized) ──────────────────────────────
+    let studentLeaveReasons = [];
+    try {
+      const reasonGroups = await LeaveModel.aggregate([
+        ...getStudentDeptPipeline(),
+        {
+          $addFields: {
+            safeReason: { $toLower: { $ifNull: ["$Reason", ""] } }
+          }
+        },
+        {
+          $addFields: {
+            category: {
+              $switch: {
+                branches: [
+                  { case: { $regexMatch: { input: "$safeReason", regex: /medical|health|sick|hospital|fever|ill|doctor|surgery|treatment/i } }, then: "Medical / Health" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /family|relative|marriage|wedding|death|funeral|emergency/i } }, then: "Family Emergency" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /exam|study|test|assignment|project|submission|academic/i } }, then: "Academic" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /travel|trip|tour|station|native|hometown|outstation/i } }, then: "Travel" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /festival|holiday|celebration|puja|eid|diwali|christmas/i } }, then: "Festival / Holiday" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /internship|placement|interview|job|company|corporate/i } }, then: "Placement / Internship" },
+                  { case: { $regexMatch: { input: "$safeReason", regex: /personal|private|home/i } }, then: "Personal" },
+                ],
+                default: "Other",
+              },
+            },
+          },
+        },
+        { $group: { _id: "$category", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]);
+      studentLeaveReasons = reasonGroups.map(({ _id, count }) => ({ reason: _id, count }));
+    } catch (e) {
+      console.error("[systemInsights] studentLeaveReasons error:", e.message);
     }
 
-    const roleContexts = {
-      "Faculty": `
-        ROLE: FACULTY
-        INTELLIGENCE FOCUS:
-        - Only student leave insights
-        - Most common leave types
-        - Peak leave dates
-        - Delay patterns
-      `,
-      "Departmental Admin": `
-        ROLE: DEPARTMENT_ADMIN
-        INTELLIGENCE FOCUS:
-        - Student + faculty comparison
-        - Approval vs rejection patterns
-        - Department-level anomalies
-      `,
-      "Super Admin": `
-        ROLE: SUPER_ADMIN
-        INTELLIGENCE FOCUS:
-        - Institution-wide insights
-        - Certificate demand trends
-        - Average decision time
-        - Cross-department performance
-        - Admin efficiency comparison
-      `
+    // ── 2. Student Monthly Stats (last 6 months) ────────────────────────────
+    let studentMonthlyStats = [];
+    try {
+      const monthlyAgg = await LeaveModel.aggregate([
+        ...getStudentDeptPipeline(),
+        { $match: { createdAt: { $gte: sixMonthsAgo } } },
+        {
+          $group: {
+            _id: {
+              month: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+              status: "$status",
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.month": 1 } },
+      ]);
+      const monthMap = {};
+      monthlyAgg.forEach(({ _id, count }) => {
+        const m = String(_id.month || "Unknown");
+        if (!monthMap[m]) monthMap[m] = { month: m, total: 0, approved: 0, rejected: 0, pending: 0 };
+        if (_id.status) {
+          const k = String(_id.status).toLowerCase();
+          if (monthMap[m].hasOwnProperty(k)) monthMap[m][k] = count;
+        }
+        monthMap[m].total += count;
+      });
+      studentMonthlyStats = Object.values(monthMap);
+    } catch (e) {
+      console.error("[systemInsights] studentMonthlyStats error:", e.message);
+    }
+
+    // ── 3. Student Status Counts ────────────────────────────────────────────
+    let studentStatusStats = { total: 0, approved: 0, rejected: 0, pending: 0 };
+    try {
+      const statusAgg = await LeaveModel.aggregate([
+        ...getStudentDeptPipeline(),
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]);
+      statusAgg.forEach(({ _id, count }) => {
+        if (_id) studentStatusStats[_id.toLowerCase()] = count;
+        studentStatusStats.total += count;
+      });
+    } catch (e) {
+      console.error("[systemInsights] studentStatusStats error:", e.message);
+    }
+
+    // ── 4. Faculty/Admin Leave Data (for DeptAdmin + SuperAdmin) ─────────────
+    let facultyLeaveData = null;
+    if (isDeptAdmin || isSuperAdmin) {
+      try {
+        const facultyPipeline = isSuperAdmin ? [] : [
+          {
+            $lookup: {
+              from: "adminregisters",
+              localField: "admin",
+              foreignField: "_id",
+              as: "adminInfo",
+            },
+          },
+          { $unwind: "$adminInfo" },
+          { $match: { "adminInfo.department": department } },
+        ];
+
+        // Faculty leave reasons
+        const facultyReasons = await LeaveAdminModel.aggregate([
+          ...facultyPipeline,
+          { $group: { _id: "$type", count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ]);
+
+        // Faculty leave status
+        const facultyStatus = await LeaveAdminModel.aggregate([
+          ...facultyPipeline,
+          { $group: { _id: "$status", count: { $sum: 1 } } },
+        ]);
+        const fStats = { total: 0, approved: 0, rejected: 0, pending: 0 };
+        facultyStatus.forEach(({ _id, count }) => {
+          if (_id) fStats[_id.toLowerCase()] = count;
+          fStats.total += count;
+        });
+
+        // Faculty monthly
+        const facultyMonthly = await LeaveAdminModel.aggregate([
+          ...facultyPipeline,
+          { $match: { createdAt: { $gte: sixMonthsAgo } } },
+          {
+            $group: {
+              _id: {
+                month: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+                status: "$status",
+              },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { "_id.month": 1 } },
+        ]);
+        const fMonthMap = {};
+        facultyMonthly.forEach(({ _id, count }) => {
+          const m = String(_id.month || "Unknown");
+          if (!fMonthMap[m]) fMonthMap[m] = { month: m, total: 0, approved: 0, rejected: 0, pending: 0 };
+          if (_id.status) {
+            const k = String(_id.status).toLowerCase();
+            if (fMonthMap[m].hasOwnProperty(k)) fMonthMap[m][k] = count;
+          }
+          fMonthMap[m].total += count;
+        });
+
+        facultyLeaveData = {
+          leaveTypes: facultyReasons.map(({ _id, count }) => ({ type: _id, count })),
+          statusStats: fStats,
+          monthlyStats: Object.values(fMonthMap),
+        };
+      } catch (e) {
+        console.error("[systemInsights] facultyLeaveData error:", e.message);
+      }
+    }
+
+    // ── Build the data summary for AI ────────────────────────────────────────
+    const dataForAI = {
+      role,
+      department: department || "Institution-Wide",
+      studentLeaves: {
+        reasonBreakdown: studentLeaveReasons,
+        statusStats: studentStatusStats,
+        monthlyStats: studentMonthlyStats,
+      },
+    };
+    if (facultyLeaveData) {
+      dataForAI.facultyAdminLeaves = facultyLeaveData;
+    }
+
+    // ── Role context for AI ─────────────────────────────────────────────────
+    const roleInstructions = {
+      "Faculty": `You are analyzing data ONLY for STUDENTS in the ${department} department. Focus on student leave patterns, which reasons are most common, which months see spikes, and actionable insights for the faculty member managing these students.`,
+      "Departmental Admin": `You are analyzing data for BOTH students AND faculty/admin in the ${department} department. Compare student vs faculty leave patterns. Identify if faculty absences correlate with student leave spikes. Provide department-level management insights.`,
+      "Super Admin": `You are analyzing institution-wide data across ALL departments. Compare student and faculty/admin leave patterns. Identify institutional trends, departmental anomalies, and provide strategic high-level recommendations.`,
     };
 
     const prompt = `
-      You are a DATA INTERPRETATION + DECISION INTELLIGENCE SYSTEM for Requesta, an institutional workflow platform.
-      This is NOT a chatbot. You must provide realistic, numerical, and actionable insights with mandatory "WHY" explanations.
+You are an AI Leave Intelligence Analyst for Requesta, an institutional leave management platform.
+Your job is to interpret REAL leave data and provide meaningful, data-backed insights.
 
-      CURRENT ROLE: ${role}
-      DEPARTMENT: ${department || "Institution-Wide"}
-      ${roleContexts[role] || "Strategic institutional oversight."}
+${roleInstructions[role] || "Provide general leave analytics insights."}
 
-      INPUT DATA (RAW AGGREGATIONS):
-      ${JSON.stringify(analyticsData)}
+ACTUAL DATA FROM DATABASE:
+${JSON.stringify(dataForAI, null, 2)}
 
-      STRICT REALISM & INTELLIGENCE RULES:
-      1. NO generic text. NO vague insights.
-      2. REALISTIC VALUES: NEVER use extreme values like 0% or 100% unless absolutely true. Use realistic percentages (40-80%). Avoid vague statements.
-      3. NUMBERS REQUIRED: EVERY trend, alert, and suggestion MUST include numbers (count, percentage, or duration) to reflect actual data patterns.
-      4. THE "WHY" FACTOR: Every single insight MUST include reasoning. Add "WHY" to everything based on institutional cycles.
-         - Bad: "Casual leaves are high"
-         - Good: "Casual leaves account for 52%, likely due to increased personal commitments during this period"
-      5. SYSTEM ALERTS (URGENT + ACTIONABLE): Alerts must indicate the problem clearly, include numbers, and state urgency (e.g., "7 requests pending for more than 72 hours (SLA breach)", "Rejection rate increased by 25% this week"). Avoid generic alerts.
-      6. ACTIONABLE STRATEGY: Suggestions must directly relate to data and be practically implementable (e.g., "Introduce a 48-hour SLA to reduce pending requests").
-      7. ROLE ADAPTATION: STRICTLY adapt outputs based on the ROLE defined above.
+STRICT RULES:
+1. ONLY reference numbers that exist in the data above. Do NOT invent statistics.
+2. Every insight MUST include the actual count or percentage from the data.
+3. Explain the "WHY" behind patterns — relate it to academic cycles, seasons, festivals, exam periods, etc.
+4. Compare months to identify trends (e.g., "March saw 12 leaves vs February's 8 — a 50% increase likely due to end-of-semester exam stress")
+5. Identify the TOP leave reason and explain why it dominates.
+6. If faculty data is present, compare student vs faculty patterns.
+7. Flag any concerning patterns (e.g., high rejection rates, too many pending requests, unusual spikes).
 
-      FINAL OUTPUT FORMAT (STRICT JSON ONLY):
-      {
-        "executiveSummary": {
-          "systemHealth": "GOOD | MODERATE | CRITICAL",
-          "summary": "2-3 lines explaining system condition, must reflect actual data patterns and include numbers.",
-          "keyRisk": "Most critical issue identified.",
-          "immediateAction": "What should be done right now."
-        },
-        "trends": ["Format: Insight + Number/Stat + WHY Reasoning"],
-        "alerts": ["Format: High-priority numerical alert + Urgency + Explanation"],
-        "suggestions": ["Specific, data-backed practical recommendation"],
-        "advancedAnalytics": {
-          "topLeaveReasons": [{"reason": "string", "count": number}],
-          "averageDecisionTime": "string (in days or hours)",
-          "approvalRate": "string (percentage)",
-          "rejectionRate": "string (percentage)",
-          "peakDates": [{"date": "string", "requests": number}],
-          "adminPerformance": [{"admin": "string", "avgTime": "string", "approvalRate": "string"}],
-          "anomalies": ["Nuanced numerical and analytical anomalies"]
-        }
-      }
-    `;
+RESPOND IN THIS EXACT JSON FORMAT:
+{
+  "executiveSummary": {
+    "systemHealth": "GOOD | MODERATE | CRITICAL",
+    "headline": "One-line data-backed headline about the current leave situation",
+    "summary": "2-3 lines with specific numbers from the data explaining the overall state",
+    "keyRisk": "The single most concerning finding with numbers",
+    "immediateAction": "One concrete action to take right now"
+  },
+  "leaveReasonInsights": [
+    {
+      "reason": "Category name from data",
+      "count": actual_number,
+      "percentage": calculated_percentage,
+      "insight": "Why this reason is high/low and what it means — reference academic cycles, seasons, etc."
+    }
+  ],
+  "monthlyInsights": [
+    {
+      "month": "YYYY-MM",
+      "total": actual_number,
+      "insight": "What happened this month and why — compare to other months"
+    }
+  ],
+  "alerts": ["Urgent, specific, number-backed alerts about concerning patterns"],
+  "recommendations": ["Actionable, specific recommendations based on the data patterns"],
+  "facultyComparison": "Only if faculty data exists: Compare student vs faculty leave patterns with numbers" | null
+}
+`;
 
     const aiRaw = await callAIWithFallback(prompt);
 
-    // Ensure all critical fields exist for frontend stability
+    // Ensure all critical fields exist
     const finalInsights = {
       executiveSummary: aiRaw.executiveSummary || {
         systemHealth: "MODERATE",
-        summary: "Intelligence engine initializing...",
-        keyRisk: "Limited historical data",
-        immediateAction: "Continue monitoring request volume"
+        headline: "Leave intelligence initializing...",
+        summary: "Collecting institutional data patterns.",
+        keyRisk: "Limited data for analysis",
+        immediateAction: "Continue monitoring"
       },
-      trends: Array.isArray(aiRaw.trends) ? aiRaw.trends : [],
+      leaveReasonInsights: Array.isArray(aiRaw.leaveReasonInsights) ? aiRaw.leaveReasonInsights : [],
+      monthlyInsights: Array.isArray(aiRaw.monthlyInsights) ? aiRaw.monthlyInsights : [],
       alerts: Array.isArray(aiRaw.alerts) ? aiRaw.alerts : [],
-      suggestions: Array.isArray(aiRaw.suggestions) ? aiRaw.suggestions : [],
-      advancedAnalytics: aiRaw.advancedAnalytics || {}
+      recommendations: Array.isArray(aiRaw.recommendations) ? aiRaw.recommendations : [],
+      facultyComparison: aiRaw.facultyComparison || null,
+      // Also pass the raw data so the frontend can show data visualizations
+      rawData: dataForAI,
     };
 
     return res.json(finalInsights);
   } catch (err) {
     console.error("[getAIInsights] Intelligence Error:", err);
     return res.json({
-      trends: ["Data interpretation temporarily offline."],
-      alerts: ["Security/Performance monitoring active (Internal)."],
-      suggestions: ["Check raw metrics or retry insights in 2 minutes."],
-      advancedAnalytics: {}
+      executiveSummary: { systemHealth: "MODERATE", headline: "AI temporarily unavailable", summary: "Please retry.", keyRisk: "N/A", immediateAction: "Retry" },
+      leaveReasonInsights: [],
+      monthlyInsights: [],
+      alerts: ["AI analysis temporarily offline. Retry in a moment."],
+      recommendations: ["Try refreshing the insights panel."],
+      facultyComparison: null,
+      rawData: null,
     });
   }
 };
