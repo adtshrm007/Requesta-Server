@@ -94,23 +94,26 @@ export const sendOTP = async (req, res) => {
       otp: otpCode,
     });
     await newOTP.save();
-    (async () => {
-      try {
-        const { subject, text } = mailTemplate(student.name, otpCode);
-        await transport.sendMail({
-          from: '"Requesta Portal" <adtshrm1@gmail.com>',
-          to: email,
-          subject,
-          text,
-        });
-      } catch (emailErr) {
-        console.error("Error sending registration email:", emailErr);
-      }
-    })();
+
+    try {
+      const { subject, text } = mailTemplate(student.name, otpCode);
+      const info = await transport.sendMail({
+        from: '"Requesta Portal" <adtshrm1@gmail.com>',
+        to: email,
+        subject,
+        text,
+      });
+      console.log("[Email:OTP] Sent to", email, "| MessageId:", info.messageId);
+    } catch (emailErr) {
+      console.error("[Email:OTP] FAILED for", email, "| Error:", emailErr.message);
+      return res.status(500).json({ message: "OTP generated but email failed to send. Please check email configuration.", error: emailErr.message });
+    }
+
     return res
       .status(200)
       .json({ message: "OTP sent successfully", data: newOTP });
   } catch (err) {
+    console.error("[sendOTP] Error:", err.message);
     return res.status(500).json({ message: "Server error" });
   }
 };

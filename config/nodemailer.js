@@ -9,3 +9,8 @@ export const transport = nodemailer.createTransport({
     pass: process.env.APP_PASSWORD,
   }
 });
+
+// Verify credentials on startup
+transport.verify()
+  .then(() => console.log("✅ Nodemailer: Gmail transport verified — ready to send emails"))
+  .catch((err) => console.error("❌ Nodemailer: Gmail transport FAILED —", err.message));
