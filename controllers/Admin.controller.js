@@ -2,7 +2,7 @@ import AdminRegister from "../models/adminRegister.model.js";
 import LeaveModel from "../models/leave.model.js";
 import LeaveAdminModel from "../models/LeaveAdmins.model.js";
 import Student from "../models/studentRegister.model.js";
-import { transport } from "../config/nodemailer.js";
+import { sendEmail } from "../utils/sendEmail.js";
 import { registrationAdminTemplate } from "../templates/RegistrationAdmin.template.js";
 import Certificate from "../models/certificate.model.js";
 import OTPAdmin from "../models/OTPAdmin.model.js";
@@ -64,7 +64,7 @@ export const registerAdmin = async (req, res) => {
           email,
           role
         );
-        await transport.sendMail({
+        await sendEmail({
           from: '"Requesta Portal" <adtshrm1@gmail.com>',
           to: email,
           subject,
@@ -151,7 +151,7 @@ export const sendOTP = async (req, res) => {
     (async () => {
       try {
         const { subject, text } = mailTemplate(admin.name, otpCode);
-        await transport.sendMail({
+        await sendEmail({
           from: '"Requesta Portal" <adtshrm1@gmail.com>',
           to: email,
           subject,

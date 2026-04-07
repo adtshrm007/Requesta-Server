@@ -1,7 +1,7 @@
 import studentRegister from "../models/studentRegister.model.js";
 import LeaveModel from "../models/leave.model.js";
 import Certificate from "../models/certificate.model.js";
-import { transport } from "../config/nodemailer.js";
+import { sendEmail } from "../utils/sendEmail.js";
 import { mailTemplate } from "../templates/ForgotPassword.template.js";
 import { registrationTemplate } from "../templates/Registration.template.js";
 import otp from "../models/OTP.model.js";
@@ -34,7 +34,7 @@ export const registerStudent = async (req, res) => {
     (async () => {
       try {
         const { subject, text, html } = registrationTemplate(name, email);
-        await transport.sendMail({
+        await sendEmail({
           from: '"Requesta Portal" <adtshrm1@gmail.com>',
           to: email,
           subject,
@@ -97,7 +97,7 @@ export const sendOTP = async (req, res) => {
 
     try {
       const { subject, text } = mailTemplate(student.name, otpCode);
-      const info = await transport.sendMail({
+      const info = await sendEmail({
         from: '"Requesta Portal" <adtshrm1@gmail.com>',
         to: email,
         subject,

@@ -2,7 +2,7 @@ import LeaveModel from "../models/leave.model.js";
 import studentRegister from "../models/studentRegister.model.js";
 import AdminRegister from "../models/adminRegister.model.js";
 import { uploadToCloudinary } from "../middleware/multer.js";
-import { transport } from "../config/nodemailer.js";
+import { sendEmail } from "../utils/sendEmail.js";
 import { leaveSubmissionTemplate } from "../templates/LeaveSubmission.template.js";
 import { leaveUpdateTemplate } from "../templates/LeaveUpdate.template.js";
 import { canActOnStudentLeave } from "../services/workflow.service.js";
@@ -196,7 +196,7 @@ export const UpdateLeaves = async (req, res) => {
             updateStatus.status,
             actorRole
           );
-          await transport.sendMail({
+          await sendEmail({
             from: '"Requesta Portal" <adtshrm1@gmail.com>',
             to: updateStatus.studentId.email,
             subject, text, html,
@@ -230,7 +230,7 @@ export const getLeaveAuditLogs = async (req, res) => {
 const sendLeaveEmail = async (student) => {
   try {
     const { subject, text, html } = leaveSubmissionTemplate(student.name);
-    const info = await transport.sendMail({
+    const info = await sendEmail({
       from: '"Requesta Portal" <adtshrm1@gmail.com>',
       to: student.email,
       subject, text, html,

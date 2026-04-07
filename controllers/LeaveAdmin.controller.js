@@ -4,7 +4,7 @@ import { uploadToCloudinary } from "../middleware/multer.js";
 import { canActOnAdminLeave } from "../services/workflow.service.js";
 import { createLog, getLogsForRequest } from "../services/auditLog.service.js";
 import { leaveUpdateTemplate } from "../templates/LeaveUpdate.template.js";
-import { transport } from "../config/nodemailer.js";
+import { sendEmail } from "../utils/sendEmail.js";
 
 // ── Submit Leave (Admin: Faculty or Departmental Admin) ───────────────────────
 export const submitLeaves = async (req, res) => {
@@ -216,7 +216,7 @@ export const UpdateLeaves = async (req, res) => {
             updateStatus.type,
             updateStatus.status
           );
-          await transport.sendMail({
+          await sendEmail({
             from: '"Requesta Portal" <adtshrm1@gmail.com>',
             to: applicant.email,
             subject, text, html,

@@ -1,7 +1,7 @@
 import Certificate from "../models/certificate.model.js";
 import Student from "../models/studentRegister.model.js";
 import AdminRegister from "../models/adminRegister.model.js";
-import { transport } from "../config/nodemailer.js";
+import { sendEmail } from "../utils/sendEmail.js";
 import { certificateSubmissionTemplate } from "../templates/CertificateSubmission.template.js";
 import { certificateUpdateTemplate } from "../templates/CertificateUpdate.template.js";
 import { uploadToCloudinary } from "../middleware/multer.js";
@@ -47,7 +47,7 @@ export const handleCertificateRequests = async (req, res) => {
     (async () => {
       try {
         const { subject, text, html } = certificateSubmissionTemplate(student.name);
-        await transport.sendMail({
+        await sendEmail({
           from: '"Requesta Portal" <adtshrm1@gmail.com>',
           to: student.email,
           subject, text, html,
@@ -161,7 +161,7 @@ export const UpdateCertificates = async (req, res) => {
             updateStatus.purpose,
             updateStatus.status
           );
-          await transport.sendMail({
+          await sendEmail({
             from: '"Requesta Portal" <adtshrm1@gmail.com>',
             to: updateStatus.student.email,
             subject, text, html,
