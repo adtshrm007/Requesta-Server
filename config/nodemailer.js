@@ -1,45 +1,89 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-// Lazy initialization — don't crash on startup if key is missing
-let _resend = null;
-const getResend = () => {
-  if (!_resend) {
-    const key = process.env.RESEND_API_KEY;
-    if (!key) throw new Error("RESEND_API_KEY environment variable is not set.");
-    _resend = new Resend(key);
+// ── Validate required environment variables at startup ────────────────────────
+const REQUIRED_ENV = ["USER_EMAIL", "APP_PASSWORD"];
+const missingEnv = REQUIRED_ENV.filter((key) => !process.env[key]);
+
+if (missingEnv.length > 0) {
+  console.error(
+    `❌ [Email] Missing required environment variables: ${missingEnv.join(", ")}`
+  );
+  console.error(
+    "   → Add them to your .env file. Email service will fail until then."
+  );
+} else {
+  console.log(
+    `✅ [Email] Nodemailer ready — using Gmail SMTP as ${process.env.USER_EMAIL}`
+  );
+}
+
+// ── Create Gmail SMTP transporter ─────────────────────────────────────────────
+// Uses Gmail App Password (NOT your normal Gmail password).
+// Generate one at: https://myaccount.google.com/apppasswords
+const createTransporter = () => {
+  if (missingEnv.length > 0) {
+    throw new Error(
+      `Cannot create email transporter: missing env vars [${missingEnv.join(", ")}]`
+    );
   }
-  return _resend;
+
+  return nodemailer.createTransport({
+    service: "gmail",          // Resolves host/port automatically for Gmail
+    auth: {
+      user: process.env.USER_EMAIL,   // e.g. adtshrm1@gmail.com
+      pass: process.env.APP_PASSWORD, // 16-char App Password (spaces are ignored)
+    },
+    // Explicit TLS options — belt-and-suspenders for localhost dev
+    tls: {
+      rejectUnauthorized: false, // Allow self-signed certs in dev; set true in prod
+    },
+  });
 };
 
-/**
- * Unified sendMail wrapper — drop-in replacement for nodemailer transport.sendMail()
- * Accepts the same { from, to, subject, text, html } shape.
- */
+// ── Verify transporter on startup (non-blocking) ──────────────────────────────
+// This pings Gmail's SMTP server to confirm credentials are valid.
+if (missingEnv.length === 0) {
+  const verifyTransporter = createTransporter();
+  verifyTransporter.verify((err) => {
+    if (err) {
+      console.error("❌ [Email] SMTP verification FAILED:", err.message);
+      console.error(
+        "   → Check USER_EMAIL and APP_PASSWORD in your .env file."
+      );
+      console.error(
+        "   → Make sure 2-Step Verification is ON and you used an App Password."
+      );
+    } else {
+      console.log("✅ [Email] SMTP connection verified — ready to send emails.");
+    }
+  });
+}
+
+// ── Exported transport object ──────────────────────────────────────────────────
+// This object mirrors the nodemailer transport interface so all existing
+// controllers that call `transport.sendMail(...)` continue to work without
+// any changes. Each call creates a fresh transporter to avoid stale connections.
 export const transport = {
   sendMail: async ({ from, to, subject, text, html }) => {
-    const resend = getResend();
-    const result = await resend.emails.send({
-      from: from || `Requesta Portal <onboarding@resend.dev>`,
-      to: Array.isArray(to) ? to : [to],
+    const transporter = createTransporter(); // Fresh instance per send
+
+    const mailOptions = {
+      from: from || `"Requesta Portal" <${process.env.USER_EMAIL}>`,
+      to,
       subject,
-      text,
-      html,
-    });
+      ...(text && { text }),
+      ...(html && { html }),
+    };
 
-    if (result.error) {
-      throw new Error(result.error.message || "Resend email failed");
-    }
+    const info = await transporter.sendMail(mailOptions);
 
-    console.log("[Email] Sent successfully | ID:", result.data?.id);
-    return { messageId: result.data?.id };
+    console.log(
+      `✅ [Email] Sent successfully | To: ${to} | Subject: "${subject}" | MessageId: ${info.messageId}`
+    );
+
+    return { messageId: info.messageId };
   },
 };
-
-if (!process.env.RESEND_API_KEY) {
-  console.warn("⚠️  Resend: RESEND_API_KEY not set — emails will fail until this is added to Render env vars");
-} else {
-  console.log("✅ Resend: API key loaded — email service ready");
-}
