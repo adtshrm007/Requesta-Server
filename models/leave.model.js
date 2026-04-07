@@ -47,6 +47,14 @@ const LeaveModelSchema = new Schema(
       type: String,
       default: null,
     },
+    fromDate: {
+      type: Date,
+      required: true,
+    },
+    toDate: {
+      type: Date,
+      required: true,
+    },
   },
   { timestamps: true }
 );

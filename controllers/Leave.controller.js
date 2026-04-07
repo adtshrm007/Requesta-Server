@@ -38,6 +38,8 @@ export const handleLeaves = async (req, res) => {
       studentRegNumber: student.registrationNumber,
       subject: req.body.subject,
       Reason: req.body.Reason,
+      fromDate: new Date(req.body.fromDate),
+      toDate: new Date(req.body.toDate),
       supportingDocument: supportingDocumentUrl,
       currentHandlerRole: "FACULTY",  // Always starts at Faculty
       createdBy: student._id,

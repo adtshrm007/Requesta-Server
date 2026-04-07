@@ -29,15 +29,19 @@ STRICT:
 Return JSON:
 {
   "subject": "professional subject",
-  "body": "detailed formal paragraph (4-6 lines)"
+  "body": "detailed formal paragraph (4-6 lines)",
+  "extractedStartDate": "YYYY-MM-DD" | null,
+  "extractedEndDate": "YYYY-MM-DD" | null
 }
 
 Example:
-Input: "i am sick for 3 days"
+Input: "i am sick for 3 days starting 2023-10-01"
 Output:
 {
   "subject": "Request for Leave of Absence Due to Medical Reasons",
-  "body": "I would like to formally request leave of absence..."
+  "body": "I would like to formally request leave of absence...",
+  "extractedStartDate": "2023-10-01",
+  "extractedEndDate": "2023-10-03"
 }
 `;
 
@@ -475,6 +479,8 @@ RESPOND IN THIS EXACT JSON FORMAT:
 const _generateFallback = (type, rawText) => ({
   subject: `${type === "CERTIFICATE" ? "Request for Certificate" : "Leave Application"} - ${rawText.slice(0, 20)}...`,
   body: `I am writing to formally submit a request regarding: ${rawText}. Please consider this application for approval.`,
+  extractedStartDate: null,
+  extractedEndDate: null,
   error: "AI Assistant is currently offline. Providing basic formalization."
 });
 
