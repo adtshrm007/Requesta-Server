@@ -14,12 +14,11 @@ console.log(
 );
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-// ── Create a single persistent transporter with connection pooling ──────────────
+// ── Create a single persistent transporter ──────────────
 const transporter = nodemailer.createTransport({
-  pool: true, // Use pooled connections for production efficiency
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // Implicit SSL — highly recommended for production
+  port: 587,
+  secure: false, // STARTTLS
   auth: {
     user: process.env.USER_EMAIL || "adtshrm1@gmail.com",
     pass: process.env.APP_PASSWORD,
@@ -27,19 +26,14 @@ const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
+  connectionTimeout: 10000, // 10 seconds max wait for connection
+  socketTimeout: 15000,
 });
 
 // ── Verify on startup ─────────────────────────────────────────────────────────
-// Note: We don't block exports, but we log connection status
 transporter.verify((err, success) => {
   if (err) {
     console.error("❌ [Email] SMTP FAILED:", err.message);
-    console.error(
-      "   Fix 1 → Check if environment variables are injected correctly in your production host."
-    );
-    console.error(
-      "   Fix 2 → Regenerate App Password at: https://myaccount.google.com/apppasswords"
-    );
   } else {
     console.log("✅ [Email] SMTP verified — Gmail is connected and ready.");
   }
