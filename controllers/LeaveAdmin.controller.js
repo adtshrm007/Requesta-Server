@@ -209,6 +209,7 @@ export const UpdateLeaves = async (req, res) => {
 
     // Email notification (non-blocking)
     if (applicant.email) {
+      (async () => {
         try {
           const { subject, text, html } = leaveUpdateTemplate(
             applicant.name,
@@ -223,6 +224,7 @@ export const UpdateLeaves = async (req, res) => {
         } catch (emailErr) {
           console.error("Error sending admin leave update email:", emailErr);
         }
+      })();
     }
 
     return res.status(200).json({ message: "Status updated successfully", data: updateStatus });

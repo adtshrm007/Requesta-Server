@@ -57,22 +57,24 @@ export const registerAdmin = async (req, res) => {
       role,
     });
     await newAdmin.save();
-    try {
-      const { subject, text, html } = registrationAdminTemplate(
-        name,
-        email,
-        role
-      );
-      await sendEmail({
-        from: '"Requesta Portal" <adtshrm1@gmail.com>',
-        to: email,
-        subject,
-        text,
-        html,
-      });
-    } catch (emailErr) {
-      console.error("Error sending registration email:", emailErr);
-    }
+    (async () => {
+      try {
+        const { subject, text, html } = registrationAdminTemplate(
+          name,
+          email,
+          role
+        );
+        await sendEmail({
+          from: '"Requesta Portal" <adtshrm1@gmail.com>',
+          to: email,
+          subject,
+          text,
+          html,
+        });
+      } catch (emailErr) {
+        console.error("Error sending registration email:", emailErr);
+      }
+    })();
     return res
       .status(200)
       .json({ message: "Admin registered succesfully", data: newAdmin });
