@@ -130,45 +130,8 @@ export const getDepartmentalAdmin = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-export const sendOTP = async (req, res) => {
-  const { adminID, email } = req.body;
-  try {
-    const admin = await AdminRegister.findOne({
-      adminID,
-      email,
-    });
-
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
-    }
-
-    const otpCode = Math.floor(Math.random() * 1000000);
-    const newOTP = new OTPAdmin({
-      admin: admin._id,
-      otp: otpCode,
-    });
-    await newOTP.save();
-    try {
-      const { subject, text } = mailTemplate(admin.name, otpCode);
-      await sendEmail({
-        from: '"Requesta Portal" <adtshrm1@gmail.com>',
-        to: email,
-        subject,
-        text,
-      });
-    } catch (emailErr) {
-      console.error("Error sending registration email:", emailErr);
-    }
-    return res
-      .status(200)
-      .json({ message: "OTP sent successfully", data: newOTP });
-  } catch (err) {
-    console.log(err);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
 export const handlePasswordChange = async (req, res) => {
-  const { otp: enteredOTP, password } = req.body;
+  const { oldPassword, newPassword } = req.body;
   try {
     const admin = await AdminRegister.findOne({
       adminID: req.user.adminID,
@@ -178,61 +141,19 @@ export const handlePasswordChange = async (req, res) => {
       return res.status(404).json({ message: "Admin not found" });
     }
 
-    const otpRecord = await OTPAdmin.findOne({ admin: admin._id }).sort({
-      createdAt: -1,
-    });
-    if (!otpRecord) {
-      return res.status(400).json({ message: "No OTP found" });
-    }
-    const isMatch = await otpRecord.isOTPCorrect(enteredOTP);
+    const isMatch = await admin.isPasswordCorrect(oldPassword);
     if (!isMatch) {
-      return res.status(400).json({ message: "Wrong OTP" });
+      return res.status(400).json({ message: "Incorrect Old Password" }); /* Changed from OTP check to oldPassword check */
     }
 
-    admin.password = password;
+    admin.password = newPassword;
     await admin.save();
 
     res.status(200).json({
       message: "Password updated Successfully",
     });
   } catch (err) {
-    return err;
-  }
-};
-export const loginAdminUsingEmail = async (req, res) => {
-  const { adminID, email, otp: enteredOTP } = req.body;
-  try {
-    const admin = await AdminRegister.findOne({
-      adminID,
-      email,
-    });
-
-    if (!admin) {
-      return res.status(404).json({ message: "Admin not found" });
-    }
-
-    const otpRecord = await OTPAdmin.findOne({ admin: admin._id }).sort({
-      createdAt: -1,
-    });
-    if (!otpRecord) {
-      return res.status(400).json({ message: "No OTP found" });
-    }
-    const isMatch = await otpRecord.isOTPCorrect(enteredOTP);
-    if (!isMatch) {
-      return res.status(201).json({ message: "Wrong OTP" });
-    }
-    const refreshToken = admin.generateRefreshToken();
-    const accessToken = admin.generateAccessToken();
-    admin.refreshToken = refreshToken;
-    await admin.save();
-    res.json({
-      message: "Admin Found",
-      data: admin,
-      accessToken,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: err.message });
   }
 };
 

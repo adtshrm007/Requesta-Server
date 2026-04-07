@@ -74,49 +74,8 @@ export const loginStudent = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-export const sendOTP = async (req, res) => {
-  const { registrationNumber, email } = req.body;
-  try {
-    const student = await studentRegister.findOne({
-      registrationNumber,
-      email,
-    });
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const otpCode = Math.floor(Math.random() * 1000000);
-    const newOTP = new otp({
-      student: student._id,
-      otp: otpCode,
-    });
-    await newOTP.save();
-
-    try {
-      const { subject, text } = mailTemplate(student.name, otpCode);
-      const info = await sendEmail({
-        from: '"Requesta Portal" <adtshrm1@gmail.com>',
-        to: email,
-        subject,
-        text,
-      });
-      console.log("[Email:OTP] Sent to", email, "| MessageId:", info.messageId);
-    } catch (emailErr) {
-      console.error("[Email:OTP] FAILED for", email, "| Error:", emailErr.message);
-      return res.status(500).json({ message: "OTP generated but email failed to send. Please check email configuration.", error: emailErr.message });
-    }
-
-    return res
-      .status(200)
-      .json({ message: "OTP sent successfully", data: newOTP });
-  } catch (err) {
-    console.error("[sendOTP] Error:", err.message);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
 export const handlePasswordChange = async (req, res) => {
-  const { otp: enteredOTP, password } = req.body;
+  const { oldPassword, newPassword } = req.body;
   try {
     const student = await studentRegister.findOne({
       registrationNumber: req.user.registrationNumber,
@@ -126,62 +85,22 @@ export const handlePasswordChange = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const otpRecord = await otp
-      .findOne({ student: student._id })
-      .sort({ createdAt: -1 });
-    if (!otpRecord) {
-      return res.status(400).json({ message: "No OTP found" });
-    }
-    const isMatch = await otpRecord.isOTPCorrect(enteredOTP);
+    const isMatch = await student.isPasswordCorrect(oldPassword);
     if (!isMatch) {
-      return res.status(400).json({ message: "Wrong OTP" });
+      return res.status(400).json({ message: "Incorrect Old Password" });
     }
 
-    student.password = password;
+    student.password = newPassword;
     await student.save();
 
     res.status(200).json({
       message: "Password updated Successfully",
     });
   } catch (err) {
-    return err;
+    return res.status(500).json({ error: err.message });
   }
 };
-export const loginStudentUsingEmail = async (req, res) => {
-  const { registrationNumber, email, otp: enteredOTP } = req.body;
-  try {
-    const student = await studentRegister.findOne({
-      registrationNumber,
-      email,
-    });
 
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const otpRecord = await otp
-      .findOne({ student: student._id })
-      .sort({ createdAt: -1 });
-    if (!otpRecord) {
-      return res.status(400).json({ message: "No OTP found" });
-    }
-    const isMatch = await otpRecord.isOTPCorrect(enteredOTP);
-    if (!isMatch) {
-      return res.status(201).json({ message: "Wrong OTP" });
-    }
-    const refreshToken = student.generateRefreshToken();
-    const accessToken = student.generateAccessToken();
-    student.refreshToken = refreshToken;
-    await student.save();
-    res.json({
-      message: "Student Found",
-      data: student,
-      accessToken,
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-};
 
 export const updateStudent = async (req, res) => {
   try {

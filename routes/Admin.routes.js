@@ -7,9 +7,7 @@ import {
   getAllStudentsDataForAdmin,
   getRequetsOfAStudentForAdmin,
   getCertificateRequetsOfAStudentForAdmin,
-  sendOTP,
   handlePasswordChange,
-  loginAdminUsingEmail,
   getFacultyAdmins,
   getDepartmentalAdmin,
   getDashboardStats,
@@ -21,8 +19,6 @@ const router = express.Router();
 
 router.post("/register", verifyAccessToken1, registerAdmin);
 router.post("/get", getAdminById);
-router.post("/otp", sendOTP);
-router.post("/email", loginAdminUsingEmail);
 router.put("/changepassword", verifyAccessToken1, handlePasswordChange);
 router.get("/dashboard", verifyAccessToken1, (req, res) => {
   res.json({ data: req.user });
