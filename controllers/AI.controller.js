@@ -425,7 +425,7 @@ RESPOND IN THIS EXACT JSON FORMAT:
   ],
   "alerts": ["Urgent, specific, number-backed alerts about concerning patterns"],
   "recommendations": ["Actionable, specific recommendations based on the data patterns"],
-  "facultyComparison": "Only if faculty data exists: Compare student vs faculty leave patterns with numbers" | null
+  "facultyComparison": "MUST be a plain STRING (not an object, not an array). If faculty data exists, write a 1-2 sentence comparison of student vs faculty leave patterns with actual numbers. If no faculty data, return null."
 }
 `;
 
@@ -444,7 +444,13 @@ RESPOND IN THIS EXACT JSON FORMAT:
       monthlyInsights: Array.isArray(aiRaw.monthlyInsights) ? aiRaw.monthlyInsights : [],
       alerts: Array.isArray(aiRaw.alerts) ? aiRaw.alerts : [],
       recommendations: Array.isArray(aiRaw.recommendations) ? aiRaw.recommendations : [],
-      facultyComparison: aiRaw.facultyComparison || null,
+      // Safety coercion: AI occasionally returns an object here — always stringify it.
+      // This prevents React error #31 (objects are not valid React children).
+      facultyComparison: aiRaw.facultyComparison
+        ? typeof aiRaw.facultyComparison === "string"
+          ? aiRaw.facultyComparison
+          : JSON.stringify(aiRaw.facultyComparison)
+        : null,
       // Also pass the raw data so the frontend can show data visualizations
       rawData: dataForAI,
     };
