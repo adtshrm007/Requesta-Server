@@ -31,14 +31,15 @@ const createTransporter = () => {
   }
 
   return nodemailer.createTransport({
-    service: "gmail",          // Resolves host/port automatically for Gmail
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,             // false = STARTTLS on port 587 (correct for Gmail)
     auth: {
-      user: process.env.USER_EMAIL,   // e.g. adtshrm1@gmail.com
-      pass: process.env.APP_PASSWORD, // 16-char App Password (spaces are ignored)
+      user: "adtshrm1@gmail.com",
+      pass: process.env.APP_PASSWORD, // 16-char Gmail App Password
     },
-    // Explicit TLS options — belt-and-suspenders for localhost dev
     tls: {
-      rejectUnauthorized: false, // Allow self-signed certs in dev; set true in prod
+      rejectUnauthorized: false, // Keeps dev working; safe to flip true in prod
     },
   });
 };

@@ -13,7 +13,7 @@ export const sendNotification = async (req, res) => {
     secure: false,
     auth: {
       user: "adtshrm1@gmail.com",
-      pass: "your-app-password",
+      pass: process.env.APP_PASSWORD,
     },
   });
 
