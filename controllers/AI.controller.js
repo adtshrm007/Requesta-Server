@@ -295,6 +295,7 @@ export const systemInsights = async (req, res) => {
 
     // ── 4. Faculty/Admin Leave Data (for DeptAdmin + SuperAdmin) ─────────────
     let facultyLeaveData = null;
+    let deptAdminLeaveData = null;
     if (isDeptAdmin || isSuperAdmin) {
       try {
         const facultyPipeline = isSuperAdmin ? [] : [
@@ -310,57 +311,97 @@ export const systemInsights = async (req, res) => {
           { $match: { "adminInfo.department": department } },
         ];
 
-        // Faculty leave reasons
-        const facultyReasons = await LeaveAdminModel.aggregate([
-          ...facultyPipeline,
-          { $group: { _id: "$type", count: { $sum: 1 } } },
-          { $sort: { count: -1 } },
-        ]);
+        const aggregateAdminLeaves = async (roleFilter) => {
+          const pipeline = [
+            ...facultyPipeline,
+            { $match: { createdByRole: roleFilter } }
+          ];
 
-        // Faculty leave status
-        const facultyStatus = await LeaveAdminModel.aggregate([
-          ...facultyPipeline,
-          { $group: { _id: "$status", count: { $sum: 1 } } },
-        ]);
-        const fStats = { total: 0, approved: 0, rejected: 0, pending: 0 };
-        facultyStatus.forEach(({ _id, count }) => {
-          if (_id) fStats[_id.toLowerCase()] = count;
-          fStats.total += count;
-        });
+          // Reasons
+          const reasons = await LeaveAdminModel.aggregate([
+            ...pipeline,
+            { $group: { _id: "$type", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+          ]);
 
-        // Faculty monthly
-        const facultyMonthly = await LeaveAdminModel.aggregate([
-          ...facultyPipeline,
-          { $match: { createdAt: { $gte: sixMonthsAgo } } },
-          {
-            $group: {
-              _id: {
-                month: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
-                status: "$status",
+          // Status
+          const statusAgg = await LeaveAdminModel.aggregate([
+            ...pipeline,
+            { $group: { _id: "$status", count: { $sum: 1 } } },
+          ]);
+          const stats = { total: 0, approved: 0, rejected: 0, pending: 0 };
+          statusAgg.forEach(({ _id, count }) => {
+            if (_id) stats[_id.toLowerCase()] = count;
+            stats.total += count;
+          });
+
+          // Monthly
+          const monthly = await LeaveAdminModel.aggregate([
+            ...pipeline,
+            { $match: { createdAt: { $gte: sixMonthsAgo } } },
+            {
+              $group: {
+                _id: {
+                  month: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+                  status: "$status",
+                },
+                count: { $sum: 1 },
               },
-              count: { $sum: 1 },
             },
-          },
-          { $sort: { "_id.month": 1 } },
+            { $sort: { "_id.month": 1 } },
+          ]);
+          const monthMap = {};
+          monthly.forEach(({ _id, count }) => {
+            const m = String(_id.month || "Unknown");
+            if (!monthMap[m]) monthMap[m] = { month: m, total: 0, approved: 0, rejected: 0, pending: 0 };
+            if (_id.status) {
+              const k = String(_id.status).toLowerCase();
+              if (monthMap[m].hasOwnProperty(k)) monthMap[m][k] = count;
+            }
+            monthMap[m].total += count;
+          });
+
+          return {
+            leaveTypes: reasons.map(({ _id, count }) => ({ type: _id, count })),
+            statusStats: stats,
+            monthlyStats: Object.values(monthMap),
+          };
+        };
+
+        facultyLeaveData = await aggregateAdminLeaves("Faculty");
+        if (isSuperAdmin) {
+          deptAdminLeaveData = await aggregateAdminLeaves("Departmental Admin");
+        }
+      } catch (e) {
+        console.error("[systemInsights] adminLeaveData error:", e.message);
+      }
+    }
+
+    // ── 5. Certificate Data (for Super Admin) ───────────────────────────────────
+    let certificateData = null;
+    if (isSuperAdmin) {
+      try {
+        const certTypes = await Certificate.aggregate([
+          { $group: { _id: "$CertificateType", count: { $sum: 1 } } },
+          { $sort: { count: -1 } }
         ]);
-        const fMonthMap = {};
-        facultyMonthly.forEach(({ _id, count }) => {
-          const m = String(_id.month || "Unknown");
-          if (!fMonthMap[m]) fMonthMap[m] = { month: m, total: 0, approved: 0, rejected: 0, pending: 0 };
-          if (_id.status) {
-            const k = String(_id.status).toLowerCase();
-            if (fMonthMap[m].hasOwnProperty(k)) fMonthMap[m][k] = count;
-          }
-          fMonthMap[m].total += count;
+        
+        const certStatusAgg = await Certificate.aggregate([
+          { $group: { _id: "$status", count: { $sum: 1 } } }
+        ]);
+        
+        const cStats = { total: 0, approved: 0, rejected: 0, pending: 0 };
+        certStatusAgg.forEach(({ _id, count }) => {
+          if (_id) cStats[_id.toLowerCase()] = count;
+          cStats.total += count;
         });
 
-        facultyLeaveData = {
-          leaveTypes: facultyReasons.map(({ _id, count }) => ({ type: _id, count })),
-          statusStats: fStats,
-          monthlyStats: Object.values(fMonthMap),
+        certificateData = {
+          typesBreakdown: certTypes.map(({ _id, count }) => ({ type: _id || "Unknown", count })),
+          statusStats: cStats
         };
       } catch (e) {
-        console.error("[systemInsights] facultyLeaveData error:", e.message);
+        console.error("[systemInsights] certificateData error:", e.message);
       }
     }
 
@@ -374,22 +415,22 @@ export const systemInsights = async (req, res) => {
         monthlyStats: studentMonthlyStats,
       },
     };
-    if (facultyLeaveData) {
-      dataForAI.facultyAdminLeaves = facultyLeaveData;
-    }
+    if (facultyLeaveData) dataForAI.facultyLeaves = facultyLeaveData;
+    if (deptAdminLeaveData) dataForAI.deptAdminLeaves = deptAdminLeaveData;
+    if (certificateData) dataForAI.certificates = certificateData;
 
     // ── Role context for AI ─────────────────────────────────────────────────
     const roleInstructions = {
       "Faculty": `You are analyzing data ONLY for STUDENTS in the ${department} department. Focus on student leave patterns, which reasons are most common, which months see spikes, and actionable insights for the faculty member managing these students.`,
-      "Departmental Admin": `You are analyzing data for BOTH students AND faculty/admin in the ${department} department. Compare student vs faculty leave patterns. Identify if faculty absences correlate with student leave spikes. Provide department-level management insights.`,
-      "Super Admin": `You are analyzing institution-wide data across ALL departments. Compare student and faculty/admin leave patterns. Identify institutional trends, departmental anomalies, and provide strategic high-level recommendations.`,
+      "Departmental Admin": `You are analyzing data for BOTH students AND faculty in the ${department} department. Compare student vs faculty leave patterns. Identify if faculty absences correlate with student leave spikes. Provide department-level management insights.`,
+      "Super Admin": `You are analyzing institution-wide data across ALL departments. Compare student, faculty, and departmental admin leave patterns. Evaluate the certificate request backlog and types. Provide strategic high-level recommendations across all tiers.`,
     };
 
     const prompt = `
-You are an AI Leave Intelligence Analyst for Requesta, an institutional leave management platform.
-Your job is to interpret REAL leave data and provide meaningful, data-backed insights.
+You are an AI Leave Intelligence Analyst for Requesta, an institutional request management platform.
+Your job is to interpret REAL administrative data and provide meaningful, data-backed insights.
 
-${roleInstructions[role] || "Provide general leave analytics insights."}
+${roleInstructions[role] || "Provide general analytics insights."}
 
 ACTUAL DATA FROM DATABASE:
 ${JSON.stringify(dataForAI, null, 2)}
@@ -400,8 +441,9 @@ STRICT RULES:
 3. Explain the "WHY" behind patterns — relate it to academic cycles, seasons, festivals, exam periods, etc.
 4. Compare months to identify trends (e.g., "March saw 12 leaves vs February's 8 — a 50% increase likely due to end-of-semester exam stress")
 5. Identify the TOP leave reason and explain why it dominates.
-6. If faculty data is present, compare student vs faculty patterns.
-7. Flag any concerning patterns (e.g., high rejection rates, too many pending requests, unusual spikes).
+6. If faculty or admin data is present, explicitly compare student vs faculty/admin patterns. Do not lump them together.
+7. If certificate data is present, provide insights into issuance bottlenecks or volume.
+8. Flag any concerning patterns (e.g., high rejection rates, too many pending requests, unusual spikes).
 
 RESPOND IN THIS EXACT JSON FORMAT:
 {
