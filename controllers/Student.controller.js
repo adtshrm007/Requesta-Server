@@ -31,20 +31,18 @@ export const registerStudent = async (req, res) => {
       year,
     });
     await newStudent.save();
-    (async () => {
-      try {
-        const { subject, text, html } = registrationTemplate(name, email);
-        await sendEmail({
-          from: '"Requesta Portal" <adtshrm1@gmail.com>',
-          to: email,
-          subject,
-          text,
-          html,
-        });
-      } catch (emailErr) {
-        console.error("Error sending registration email:", emailErr);
-      }
-    })();
+    try {
+      const { subject, text, html } = registrationTemplate(name, email);
+      await sendEmail({
+        from: '"Requesta Portal" <adtshrm1@gmail.com>',
+        to: email,
+        subject,
+        text,
+        html,
+      });
+    } catch (emailErr) {
+      console.error("Error sending registration email:", emailErr);
+    }
 
     res.status(201).json({ message: "Student registered", data: newStudent });
   } catch (err) {

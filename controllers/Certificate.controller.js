@@ -44,18 +44,16 @@ export const handleCertificateRequests = async (req, res) => {
     });
 
     // Email (non-blocking)
-    (async () => {
-      try {
-        const { subject, text, html } = certificateSubmissionTemplate(student.name);
-        await sendEmail({
-          from: '"Requesta Portal" <adtshrm1@gmail.com>',
-          to: student.email,
-          subject, text, html,
-        });
-      } catch (emailErr) {
-        console.error("Error sending certificate submission email:", emailErr);
-      }
-    })();
+    try {
+      const { subject, text, html } = certificateSubmissionTemplate(student.name);
+      await sendEmail({
+        from: '"Requesta Portal" <adtshrm1@gmail.com>',
+        to: student.email,
+        subject, text, html,
+      });
+    } catch (emailErr) {
+      console.error("Error sending certificate submission email:", emailErr);
+    }
 
     return res.status(201).json({
       message: "Certificate request submitted successfully",
@@ -154,22 +152,20 @@ export const UpdateCertificates = async (req, res) => {
 
     // Email (non-blocking)
     if (updateStatus.student?.email) {
-      (async () => {
-        try {
-          const { subject, text, html } = certificateUpdateTemplate(
-            updateStatus.student.name,
-            updateStatus.purpose,
-            updateStatus.status
-          );
-          await sendEmail({
-            from: '"Requesta Portal" <adtshrm1@gmail.com>',
-            to: updateStatus.student.email,
-            subject, text, html,
-          });
-        } catch (emailErr) {
-          console.error("Error sending certificate update email:", emailErr);
-        }
-      })();
+      try {
+        const { subject, text, html } = certificateUpdateTemplate(
+          updateStatus.student.name,
+          updateStatus.purpose,
+          updateStatus.status
+        );
+        await sendEmail({
+          from: '"Requesta Portal" <adtshrm1@gmail.com>',
+          to: updateStatus.student.email,
+          subject, text, html,
+        });
+      } catch (emailErr) {
+        console.error("Error sending certificate update email:", emailErr);
+      }
     }
 
     return res.status(200).json({ message: "Status updated successfully", data: updateStatus });

@@ -57,24 +57,22 @@ export const registerAdmin = async (req, res) => {
       role,
     });
     await newAdmin.save();
-    (async () => {
-      try {
-        const { subject, text, html } = registrationAdminTemplate(
-          name,
-          email,
-          role
-        );
-        await sendEmail({
-          from: '"Requesta Portal" <adtshrm1@gmail.com>',
-          to: email,
-          subject,
-          text,
-          html,
-        });
-      } catch (emailErr) {
-        console.error("Error sending registration email:", emailErr);
-      }
-    })();
+    try {
+      const { subject, text, html } = registrationAdminTemplate(
+        name,
+        email,
+        role
+      );
+      await sendEmail({
+        from: '"Requesta Portal" <adtshrm1@gmail.com>',
+        to: email,
+        subject,
+        text,
+        html,
+      });
+    } catch (emailErr) {
+      console.error("Error sending registration email:", emailErr);
+    }
     return res
       .status(200)
       .json({ message: "Admin registered succesfully", data: newAdmin });
@@ -148,19 +146,17 @@ export const sendOTP = async (req, res) => {
       otp: otpCode,
     });
     await newOTP.save();
-    (async () => {
-      try {
-        const { subject, text } = mailTemplate(admin.name, otpCode);
-        await sendEmail({
-          from: '"Requesta Portal" <adtshrm1@gmail.com>',
-          to: email,
-          subject,
-          text,
-        });
-      } catch (emailErr) {
-        console.error("Error sending registration email:", emailErr);
-      }
-    })();
+    try {
+      const { subject, text } = mailTemplate(admin.name, otpCode);
+      await sendEmail({
+        from: '"Requesta Portal" <adtshrm1@gmail.com>',
+        to: email,
+        subject,
+        text,
+      });
+    } catch (emailErr) {
+      console.error("Error sending registration email:", emailErr);
+    }
     return res
       .status(200)
       .json({ message: "OTP sent successfully", data: newOTP });

@@ -57,7 +57,7 @@ export const handleLeaves = async (req, res) => {
       remarks: `Leave application submitted for: ${req.body.subject}`,
     });
 
-    sendLeaveEmail(student).catch((err) => console.error("Error sending leave email:", err));
+    await sendLeaveEmail(student).catch((err) => console.error("Error sending leave email:", err));
 
     return res.status(201).json({
       message: "Leave Application Sent",
@@ -188,7 +188,6 @@ export const UpdateLeaves = async (req, res) => {
 
     // Email notification (non-blocking)
     if (updateStatus.studentId?.email) {
-      (async () => {
         try {
           const { subject, text, html } = leaveUpdateTemplate(
             updateStatus.studentName,
@@ -204,7 +203,6 @@ export const UpdateLeaves = async (req, res) => {
         } catch (emailErr) {
           console.error("Error sending leave update email:", emailErr);
         }
-      })();
     }
 
     return res.status(200).json({ message: "Status updated successfully", data: updateStatus });
