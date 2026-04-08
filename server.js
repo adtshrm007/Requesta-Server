@@ -23,27 +23,6 @@ const ALLOWED_ORIGINS = [
   "http://localhost:3000",
 ];
 
-// ── Manual CORS Headers (Bulletproof - runs before everything) ────────────────
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,DELETE,PATCH,OPTIONS"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, Accept, Origin"
-  );
-  // Immediately respond to preflight
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-  next();
-});
 
 // ── Express CORS package (secondary layer) ────────────────────────────────────
 app.use(
