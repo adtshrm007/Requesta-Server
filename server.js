@@ -19,10 +19,14 @@ const port = process.env.PORT || 5000;
 // ── Global Error Catchers to Prevent Server Crashes ───────────────────────────
 process.on('uncaughtException', (err) => {
   console.error("🔥 [Global] Uncaught Exception:", err.message);
+  // Exit to let the hosting platform restart the process
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error("🔥 [Global] Unhandled Rejection:", reason);
+  // Exit to trigger a clean restart
+  process.exit(1);
 });
 
 // ── ALLOWED ORIGINS ───────────────────────────────────────────────────────────
