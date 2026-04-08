@@ -74,8 +74,8 @@ app.use(errorHandler);
 
 connectDB()
   .then(() => {
-    app.listen(port, () => {
-      console.log(`✅ Requesta Server v2.0 running at http://localhost:${port}`);
+    app.listen(port, "0.0.0.0", () => {
+      console.log(`✅ Requesta Server v2.0 running at http://0.0.0.0:${port}`);
     });
   })
   .catch((err) => {
