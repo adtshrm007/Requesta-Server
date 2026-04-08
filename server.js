@@ -16,23 +16,51 @@ import { errorHandler } from "./middleware/errorHandler.middleware.js";
 const app = express();
 const port = process.env.PORT || 5000;
 
-// ── CORS Configuration (MUST BE FIRST) ───────────────────────────────────────
+// ── ALLOWED ORIGINS ───────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = [
+  "https://requesta-client.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+// ── Manual CORS Headers (Bulletproof - runs before everything) ────────────────
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+  );
+  // Immediately respond to preflight
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
+
+// ── Express CORS package (secondary layer) ────────────────────────────────────
 app.use(
   cors({
-    origin: ["https://requesta-client.vercel.app"],
+    origin: ALLOWED_ORIGINS,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
       "Authorization",
       "X-Requested-With",
-      "Access-Control-Allow-Origin",
       "Accept",
       "Origin",
     ],
     optionsSuccessStatus: 204,
     preflightContinue: false,
-  }),
+  })
 );
 
 app.use(express.json());
@@ -56,8 +84,13 @@ app.get("/", (req, res) => {
 // ── Centralized error handler (must be last) ──────────────────────────────────
 app.use(errorHandler);
 
-connectDB().then(() => {
-  app.listen(port, () => {
-    console.log(`✅ Requesta Server v2.0 running at http://localhost:${port}`);
+connectDB()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`✅ Requesta Server v2.0 running at http://localhost:${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error("❌ Failed to connect to MongoDB:", err.message);
+    process.exit(1);
   });
-});
