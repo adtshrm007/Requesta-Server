@@ -214,7 +214,7 @@ export const getAdvancedAnalytics = async (req, res) => {
           as: "student",
         },
       },
-      { $unwind: { path: "$student", preserveNullAndEmpty: true } },
+      { $unwind: { path: "$student", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           name: { $ifNull: ["$student.name", "Unknown"] },
