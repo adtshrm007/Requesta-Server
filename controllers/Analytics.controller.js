@@ -316,7 +316,7 @@ export const getAdvancedAnalytics = async (req, res) => {
             as: "students",
           },
         },
-        { $unwind: { path: "$students", preserveNullAndEmpty: true } },
+        { $unwind: { path: "$students", preserveNullAndEmptyArrays: true } },
         {
           $group: {
             _id: { $ifNull: ["$students.branch", "Unknown"] },
