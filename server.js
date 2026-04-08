@@ -16,6 +16,15 @@ import { errorHandler } from "./middleware/errorHandler.middleware.js";
 const app = express();
 const port = process.env.PORT || 5000;
 
+// ── Global Error Catchers to Prevent Server Crashes ───────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error("🔥 [Global] Uncaught Exception:", err.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error("🔥 [Global] Unhandled Rejection:", reason);
+});
+
 // ── ALLOWED ORIGINS ───────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   "https://requesta-client.vercel.app",
