@@ -1,102 +1,74 @@
-# Requesta Server — Decision Intelligence Backend Engine
+# Requesta Server
 
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white) ![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white) ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white) ![Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white)
+The **Requesta Server** is the robust Node.js and Express backend engine for the Requesta platform. This server manages the MongoDB database, enforces Role-Based Access Control, connects to Google Gemini for AI insights, and dispatches automated email notifications.
 
-The **Requesta Server** serves as the algorithmic processing layer, intelligent interpretation engine, and the impenetrable security firewall for the Requesta organizational application. 
+## What This Project Does
 
-Diverging drastically from standard REST API architectures that merely shuttle JSON records across network bounds, the Requesta Backend functions as an intelligent intermediary. It calculates analytical insights via complex MongoDB execution pipelines, injects system performance variables into a machine learning layer, and enforces strict, programmatic organizational hierarchies across user endpoints.
+The server acts as the central processing unit for the entire institution's data:
 
----
+- **Authentication & RBAC**: Handles secure registration and login, utilizing JSON Web Tokens (JWT) to enforce strict boundaries between Students, Departmental Admins, and Super Admins.
+- **Request Workflows**: Provides secure endpoints for submitting, fetching, and updating the status of leave and certificate applications.
+- **Decision Intelligence & Analytics**:
+  - Compiles massive amounts of MongoDB data into complex aggregation pipelines to generate numerical statistics.
+  - Sends anonymized institutional data to Google Gemini AI to generate human-readable insights, detect anomalies, and suggest policy actions directly to administrators.
+- **Audit Logging & Fraud Detection**: Actively logs administrative actions and flags potentially fraudulent or highly unusual requests before they are approved.
+- **Automated Notifications**: Automatically generates and dispatches branded HTML emails to users the moment their request is approved, rejected, or updated by an administrator.
+- **Secure File Handling**: Receives multipart form data (like medical certificates) and securely uploads them to cloud storage.
 
-## 🧠 Algorithmic Execution & Machine Intelligence
+## How It Is Built
 
-### 1. The Decision Intelligence Controller (`AI.controller.js`)
-Instead of shifting computational load to the client, the Node.js server actively parses data vectors natively.
-- **Aggregation Compilation:** The controller queries massive arrays of MongoDB clusters using `$match`, `$group`, and `$project` stages to map active Faculty leaves against Student submissions within matching departmental boundaries.
-- **Google Gemini Synthesis:** The computed array is fired securely into the Google Gemini Vertex AI model. This AI processes the exact statistical bounds of the institution in real-time, functioning as an operative "Data Analyst". It cross-references current institutional flow and writes detailed JSON schemas returning `Anomaly Behaviors`, `Workflow Suggestions`, and `Policy Actionable Insights` down to the exact percentage.
+The backend uses a modern, scalable JavaScript stack:
 
-### 2. Autonomous Asynchronous Templating
-The backend does not transmit generic plaintext strings into email notification loops.
-- An isolated `Nodemailer` subsystem generates heavily formatted, dark-themed corporate HTML blocks decoupled entirely from the React stack.
-- Status updates compute graphical elements (e.g., transforming strings into green `<button>` blocks when "APPROVED", or red warning labels when "REJECTED").
-- **Workflow Interception:** Certificate approvals, account resets, and student tracking routines seamlessly hook into the mailer without stalling the main execution thread.
+- **Core Server**: Built on **Node.js** using **Express v5** to handle routing and API endpoints.
+- **Database**: Uses **MongoDB** (a NoSQL database) combined with **Mongoose v8** to define strict schemas (data rules) for Users, Admins, Logs, and Requests.
+- **AI Integration**: Implements the `@google/generative-ai` package to power the AI drafting and analytical insights utilizing Google's Gemini models.
+- **Security**: Uses **bcryptjs** for hashing passwords and **jsonwebtoken** for securing API routes via middleware checks.
+- **Email Providers**: Integrates **Resend** and **Nodemailer** for fast, reliable transactional email delivery.
+- **File Storage**: Uses **Multer** and **Cloudinary** for processing file uploads and storing documents securely in the cloud.
 
----
+## Architecture
 
-## 🛡️ Multi-Tiered Security Systems & Network Safeguards
+The server adheres to a strict **MVC (Model-View-Controller)** pattern:
 
-Requesta ensures complete organizational integrity via extreme isolation metrics and non-negotiable authentication patterns.
+- **Models (`/models`)**: Defines the Mongoose schemas. For example, `studentRegister.model.js` ensures every student has a valid email and hashed password. Includes models for `AuditLog`, `LeaveAdmins`, and more.
+- **Controllers (`/controllers`)**: Contains the business logic. Files like `AI.controller.js` and `Analytics.controller.js` handle the heavy lifting of fetching database records, passing them to the AI, and formatting the response.
+- **Routes (`/routes`)**: Maps Express HTTP endpoints (like `/api/leave`) to their specific controller functions.
+- **Middleware (`/middleware`)**: Security checkpoints that run before a route is accessed. Used primarily for verifying JWT tokens and catching global errors to prevent server crashes.
 
-### 1. Role Based Access Control (RBAC) Hierarchies
-JWTs (JSON Web Tokens) generated during standard logon are tagged using immutable structural properties marking the authorization bound of the client.
-- **Faculty & General Administrators:** Access operates strictly on an immediate relational bound. Faculty can compute actions locally but cannot execute modifications against parallel structures.
-- **Departmental Administrators (Dept. Admin):** Tokens granted full localized modification privileges bounded exclusively to their registered departmental query string. A Computer Science administrator is fundamentally locked out of querying Mechanical Engineering clusters natively via `mongoose` filters.
-- **System Administrators (Super Admin):** Complete relational bypass privileges, enabling the calculation of massive, institution-wide metrics and multi-department operational commands.
+## Benefits for the User
 
-### 2. Credential Verification Environment 
-The authentication module relies entirely on continuous password verification and high-entropy hashing via `bcrypt`.
-- **Garbage Collection Complete:** Legacy logic systems that attempted to coordinate Email OTPs as primary login agents have been completely destroyed. This removes all unstable networking dependencies from the login flow, resolving API timeouts on slow internet protocols.
-- **Secure Key Change Methods:** Updating system passwords evaluates encrypted payload equivalence checks locally (`isPasswordCorrect()`) before mutating Mongoose schema saves.
+- **Guaranteed Security**: Sensitive institutional data and passwords are encrypted and strictly guarded by role-based access checks.
+- **Zero Manual Follow-Ups**: Automated email notifications mean staff members never have to manually email a student to tell them their leave was approved.
+- **Smart Decision Making**: Administrators are provided with actionable AI summaries instead of just raw database dumps, helping them understand the "why" behind the data.
 
----
+## Getting Started
 
-## 📂 Source Structure & MVC Mappings
+### Prerequisites
+- Node.js (v20+)
+- A MongoDB cluster (Atlas or Local)
+- API Keys for Google Gemini, Cloudinary, and Resend (or standard SMTP details).
 
-```text
-server/
-├── config/             # Environment mounting and active Mongoose connection loops
-├── controllers/        # The business logic cores
-│   ├── AI.controller.js       # The Intelligence Engine parser
-│   ├── Admin.controller.js    # Enforces Admin execution boundaries
-│   ├── Student.controller.js  # Standard Student data streams
-│   └── Analytics.controller.js# Generates the Bento-Grid numbers natively via Mongo queries
-├── middleware/         # Security firewalls
-│   └── verifyJWT.js           # Extracts Bearer parameters and checks signatures
-├── models/             # Schema structuring (NoSQL validation mapping)
-│   ├── admin.model.js
-│   ├── student.model.js
-│   └── leave.model.js
-├── routes/             # Core networking matrices (Express Routers)
-├── templates/          # HTML structures utilizing inline-CSS generation for NodeMailer
-└── utils/              # Decoupled server utilities (e.g. Asynchronous email transporter logic)
-```
-
----
-
-## 🚀 Execution & Deployment Specifications
-
-### Infrastructure Prerequisites
-- Node.js environment >= `v18.0.0+`
-- Explicit connection string targeting an actively deployed MongoDB cluster (Cloud Atlas or Local installation).
-
-### Installation Architecture
-1. Step into the active server context envelope:
+### Installation & Setup
+1. Navigate to the server directory:
    ```bash
    cd server/Requesta-Server
    ```
-2. Retrieve functional node packages:
+2. Install all dependencies:
    ```bash
    npm install
    ```
+3. Create a `.env` file in the root of the server folder. **The server will fail to connect if these are missing**:
+   ```env
+   PORT=5000
+   CLIENT_URL=http://localhost:5173  # Used for CORS
+   DB_PASSWORD=your_mongodb_password
+   GEMINI_API_KEY=your_gemini_api_key
+   USER_EMAIL=your_sending_email_address
+   APP_PASSWORD=your_email_app_password
+   ```
+   *(Note: Additional keys for Cloudinary or Resend may be required depending on your specific configuration).*
 
-### Execution Mapping
-Launch the operational service utilizing `nodemon` for active monitoring across sequential saves:
-```bash
-npm start
-```
-The application process will bind to system resources and open ports iteratively. Expect to operate effectively at root `localhost:5000`.
-
-## 🔐 Environmental Dependency Matrix
-Application runtime relies critically on `.env` parsing. Server instances lacking explicit variables will immediately crash during cluster connections.
-
-| Required Key | Type | Definition & Context |
-| :--- | :--- | :--- |
-| `DB_PASSWORD` | `string(hash)` | Credential pipeline for writing payloads against the NoSQL MongoDB instance. |
-| `USER_EMAIL` | `string(email)` | Institutional application email identifier (e.g. `requesta.noreply@domain.com`). |
-| `APP_PASSWORD` | `string(auth)` | Explicit bypass password allowing the `Nodemailer` process to transmit over encrypted SMTP channels. |
-| `PORT` | `integer` | Designates specific host interface channels dynamically when utilized across production. |
-| `GEMINI_API_KEY` | `string(hash)` | Key authorizing prompt calculation payloads against the Google Vertex infrastructure. |
-| `CLIENT_URL` | `string(URL)` | Core networking boundary restricting functional REST calls away from external, unauthorized scripts relying strictly on explicitly defined CORS parameters. |
-
----
-**Maintained by the Requesta Engineering Team**
+4. Start the server (with hot-reloading for development):
+   ```bash
+   npm run dev
+   ```
