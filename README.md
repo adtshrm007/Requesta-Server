@@ -1,6 +1,6 @@
 # ??? Requesta � Server
 
-> **Requesta** is an AI-powered academic request management system. This is the **backend API** built with Node.js, Express v5, and MongoDB. It handles student and admin authentication, leave & certificate request workflows, AI-assisted processing, analytics, and real-time notifications.
+> **Requesta** is an AI-powered academic request management system. This is the **backend API** built with Node.js, Express v5, and MongoDB. It handles student and admin authentication, leave & certificate request workflows, AI-assisted processing, analytics, and email-based status updates.
 
 ---
 
@@ -24,16 +24,16 @@
 ## ? Features
 
 - ?? **JWT Authentication** for both Students and Admins (access + refresh tokens)
-- ??? **Multi-role RBAC** � Faculty ? Departmental Admin ? Super Admin hierarchy
-- ?? **Leave Workflow** � Multi-stage approval pipeline with audit trail
-- ?? **Certificate Requests** � Students request documents, Super Admin approves
-- ?? **AI-Powered Tools** � Request generation, quality validation, approval suggestions, and system insights via Google Gemini
-- ?? **Analytics Engine** � Summary, advanced, decision intelligence, and leave insights
-- ?? **Email Notifications** � Transactional emails via Resend for all key events
-- ?? **File Uploads** � Supporting documents via Cloudinary (Multer middleware)
-- ?? **Audit Logs** � Complete action trail for every leave and certificate request
-- ?? **Health Check Endpoint** � Ready for deployment monitoring
-- ?? **Global Error Handling** � Uncaught exceptions and unhandled rejections are caught at process level
+- ??? **Multi-role RBAC**  Faculty ? Departmental Admin ? Super Admin hierarchy
+- ?? **Leave Workflow**  Multi-stage approval pipeline with audit trail
+- ?? **Certificate Requests**  Students request documents, Super Admin approves
+- ?? **AI-Powered Tools**  Request generation, quality validation, approval suggestions, and system insights via OpenRouter API (GPT-4o mini with Claude 3.5 Sonnet fallback)
+- ?? **Analytics Engine**  Summary, advanced, decision intelligence, and leave insights
+- ?? **Email Notifications**  Transactional emails via Resend for all key events
+- ?? **File Uploads**  Supporting documents via Cloudinary (Multer middleware)
+- ?? **Audit Logs**  Complete action trail for every leave and certificate request
+- ?? **Health Check Endpoint**  Ready for deployment monitoring
+- ?? **Global Error Handling**  Uncaught exceptions and unhandled rejections are caught at process level
 
 ---
 
@@ -47,7 +47,7 @@
 | Authentication | JSON Web Token (JWT) |
 | Password Hashing | bcryptjs |
 | File Storage | Cloudinary + Multer |
-| AI Engine | Google Gemini (@google/generative-ai) |
+| AI Engine | OpenRouter API (GPT-4o mini / Claude 3.5 Sonnet) |
 | Email Service | Resend |
 | Environment | dotenv |
 | Dev Server | Nodemon |
@@ -58,59 +58,59 @@
 
 ```
 Requesta-Server/
-+-- server.js                   # Entry point � Express app, routes, DB connection
++-- server.js                   # Entry point  Express app, routes, DB connection
 +-- package.json
 +-- .env                        # Environment variables (not committed)
-�
+
 +-- config/
-�   +-- connectDB.js            # MongoDB connection via Mongoose
-�   +-- cloudinary.js           # Cloudinary SDK configuration
-�
+   +-- connectDB.js            # MongoDB connection via Mongoose
+   +-- cloudinary.js           # Cloudinary SDK configuration
+
 +-- models/
-�   +-- studentRegister.model.js    # Student schema (JWT methods, bcrypt)
-�   +-- adminRegister.model.js      # Admin schema (roles, leave quotas, JWT)
-�   +-- leave.model.js              # Student leave request schema
-�   +-- LeaveAdmins.model.js        # Admin leave request schema
-�   +-- certificate.model.js        # Certificate request schema
-�   +-- AuditLog.model.js           # Audit log for actions on requests
-�   +-- OTP.model.js                # OTP for student password reset
-�   +-- OTPAdmin.model.js           # OTP for admin password reset
-�
+   +-- studentRegister.model.js    # Student schema (JWT methods, bcrypt)
+   +-- adminRegister.model.js      # Admin schema (roles, leave quotas, JWT)
+   +-- leave.model.js              # Student leave request schema
+   +-- LeaveAdmins.model.js        # Admin leave request schema
+   +-- certificate.model.js        # Certificate request schema
+   +-- AuditLog.model.js           # Audit log for actions on requests
+   +-- OTP.model.js                # OTP for student password reset
+   +-- OTPAdmin.model.js           # OTP for admin password reset
+
 +-- routes/
-�   +-- Admin.routes.js             # Admin registration, profile, dashboard
-�   +-- Student.routes.js           # Student registration, login, profile
-�   +-- Leave.routes.js             # Student leave CRUD + audit logs
-�   +-- LeaveAdmin.routes.js        # Admin leave submission & approval
-�   +-- Certificate.routes.js       # Certificate request CRUD + audit logs
-�   +-- AI.routes.js                # AI feature endpoints (dual-auth)
-�   +-- Analytics.routes.js         # Analytics & reporting endpoints
-�
+   +-- Admin.routes.js             # Admin registration, profile, dashboard
+   +-- Student.routes.js           # Student registration, login, profile
+   +-- Leave.routes.js             # Student leave CRUD + audit logs
+   +-- LeaveAdmin.routes.js        # Admin leave submission & approval
+   +-- Certificate.routes.js       # Certificate request CRUD + audit logs
+   +-- AI.routes.js                # AI feature endpoints (dual-auth)
+   +-- Analytics.routes.js         # Analytics & reporting endpoints
+
 +-- controllers/
-�   +-- Admin.controller.js         # Admin auth, profile, student views
-�   +-- Student.controller.js       # Student auth, profile management
-�   +-- Leave.controller.js         # Student leave handling & status updates
-�   +-- LeaveAdmin.controller.js    # Admin leave submission & approval
-�   +-- Certificate.controller.js   # Certificate handling & approval
-�   +-- AI.controller.js            # Gemini AI features (generate, validate, suggest)
-�   +-- Analytics.controller.js     # Data aggregation & reporting
-�   +-- Notification.controller.js  # Notification helpers
-�
+   +-- Admin.controller.js         # Admin auth, profile, student views
+   +-- Student.controller.js       # Student auth, profile management
+   +-- Leave.controller.js         # Student leave handling & status updates
+   +-- LeaveAdmin.controller.js    # Admin leave submission & approval
+   +-- Certificate.controller.js   # Certificate handling & approval
+   +-- AI.controller.js            # OpenRouter AI features (generate, validate, suggest)
+   +-- Analytics.controller.js     # Data aggregation & reporting
+   +-- Notification.controller.js  # Notification helpers
+
 +-- middleware/
-�   +-- authStudent.middleware.js   # JWT verification for students
-�   +-- authAdmin.middleware.js     # JWT verification for admins
-�   +-- VerifyRole.js               # RBAC role check middleware factory
-�   +-- multer.js                   # Multer + Cloudinary storage config
-�   +-- errorHandler.middleware.js  # Centralized Express error handler
-�
+   +-- authStudent.middleware.js   # JWT verification for students
+   +-- authAdmin.middleware.js     # JWT verification for admins
+   +-- VerifyRole.js               # RBAC role check middleware factory
+   +-- multer.js                   # Multer + Cloudinary storage config
+   +-- errorHandler.middleware.js  # Centralized Express error handler
+
 +-- services/
-�   +-- workflow.service.js         # RBAC workflow rules for all request types
-�   +-- auditLog.service.js         # Create and retrieve audit log entries
-�   +-- validation.service.js      # Input validation helpers
-�
+   +-- workflow.service.js         # RBAC workflow rules for all request types
+   +-- auditLog.service.js         # Create and retrieve audit log entries
+   +-- validation.service.js      # Input validation helpers
+
 +-- utils/
-�   +-- aiClient.js                 # OpenRouter API client with fallback logic
-�   +-- sendEmail.js                # Resend email utility wrapper
-�
+   +-- aiClient.js                 # OpenRouter API client with fallback logic
+   +-- sendEmail.js                # Resend email utility wrapper
+
 +-- templates/
     +-- Registration.template.js        # Student registration email
     +-- RegistrationAdmin.template.js   # Admin registration email
@@ -127,7 +127,7 @@ Requesta-Server/
 
 All routes are prefixed with `/api`.
 
-### ?? Auth � Student (`/api/studentregister`)
+### ?? Auth  Student (`/api/studentregister`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -140,7 +140,7 @@ All routes are prefixed with `/api`.
 | POST | `/verifyOTP` | Verify OTP and reset password |
 | GET | `/dashboard` | Student dashboard data |
 
-### ??? Auth � Admin (`/api/adminregister`)
+### ??? Auth  Admin (`/api/adminregister`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -275,7 +275,7 @@ All routes are prefixed with `/api`.
 
 ---
 
-## ?? RBAC � Role-Based Access Control
+## ?? RBAC  Role-Based Access Control
 
 The system has three admin roles organized in a strict hierarchy:
 
@@ -287,17 +287,17 @@ Super Admin
 
 | Action | Faculty | Departmental Admin | Super Admin |
 |--------|:-------:|:------------------:|:-----------:|
-| Forward student leave | ? | � | � |
-| Reject student leave | ? | ? | � |
-| Approve student leave | � | ? | � |
-| View all student leaves | � | ? | ? (read-only) |
-| Approve Faculty leave | � | ? | � |
-| Approve Dept Admin leave | � | � | ? |
-| Approve/Reject certificates | � | � | ? |
-| View analytics | � | ? | ? |
-| Add new admin | � | � | ? |
-| AI approval suggestions | � | ? | ? |
-| System insights | � | ? | ? |
+| Forward student leave | ? |  |  |
+| Reject student leave | ? | ? |  |
+| Approve student leave |  | ? |  |
+| View all student leaves |  | ? | ? (read-only) |
+| Approve Faculty leave |  | ? |  |
+| Approve Dept Admin leave |  |  | ? |
+| Approve/Reject certificates |  |  | ? |
+| View analytics |  | ? | ? |
+| Add new admin |  |  | ? |
+| AI approval suggestions |  | ? | ? |
+| System insights |  | ? | ? |
 
 ---
 
@@ -333,16 +333,16 @@ All state transitions are validated server-side. Already-completed requests (`ap
 
 ## ?? AI Integration
 
-The server integrates **Google Gemini** for intelligent academic assistance:
+The server integrates **OpenRouter API** for intelligent academic assistance. The primary model is `openai/gpt-4o-mini` with an automatic fallback to `anthropic/claude-3.5-sonnet` handled in `utils/aiClient.js`.
 
 | Feature | Endpoint | Description |
 |---------|----------|-------------|
 | **Generate Request** | `POST /api/ai/generate-request` | Drafts a formal, well-structured leave/certificate request from bullet points |
-| **Validate Request** | `POST /api/ai/validate-request` | Scores request quality (0�100) and flags incomplete or vague content |
+| **Validate Request** | `POST /api/ai/validate-request` | Scores request quality (0?100) and flags incomplete or vague content |
 | **Approval Suggestion** | `POST /api/ai/approval-suggestion` | Suggests approve/reject/forward with reasoning based on request content |
 | **System Insights** | `POST /api/ai/system-insights` | Analyses aggregate system data to surface trends and recommendations |
 
-A fallback OpenRouter client (`utils/aiClient.js`) with retry logic (GPT-4o mini ? Claude 3.5 Sonnet) is also available.
+All AI calls enforce `response_format: { type: "json_object" }` and use a strict academic system prompt to ensure consistent, safe output.
 
 ---
 
@@ -383,8 +383,8 @@ REFRESH_TOKEN_EXPIRY=10d
 RESEND_API_KEY=re_...
 USER_EMAIL=your@email.com
 
-# AI
-GEMINI_API_KEY=AIza...
+# AI (OpenRouter)
+OPENROUTER_API_KEY=sk-or-...
 
 # File Upload (Cloudinary)
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -404,7 +404,7 @@ CLOUDINARY_API_SECRET=your_api_secret
 - A MongoDB Atlas cluster (or local MongoDB instance)
 - Cloudinary account
 - Resend account
-- Google AI Studio API key (Gemini)
+- OpenRouter API key (https://openrouter.ai)
 
 ### Installation
 
