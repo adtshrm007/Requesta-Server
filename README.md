@@ -1,6 +1,6 @@
 # ??? Requesta ï¿½ Server
 
-> **Requesta** is an AI-powered academic request management system. This is the **backend API** built with Node.js, Express v5, and MongoDB. It handles student and admin authentication, leave & certificate request workflows, AI-assisted processing, analytics, and email-based status updates.
+> **Requesta** is an AI-powered academic request management system. This is the **backend API** built with Node.js, Express v5, and MongoDB. It handles student and admin authentication, leave & certificate request workflows, AI-assisted processing, analytics, and email-based status updates across **45 API endpoints** spanning **7 route groups**.
 
 ---
 
@@ -23,15 +23,15 @@
 
 ## ? Features
 
-- ?? **JWT Authentication** for both Students and Admins (access + refresh tokens)
-- ??? **Multi-role RBAC**  Faculty ? Departmental Admin ? Super Admin hierarchy
-- ?? **Leave Workflow**  Multi-stage approval pipeline with audit trail
+- ?? **JWT Authentication** for both Students and Admins (access + refresh tokens, 2 separate auth middlewares)
+- ??? **Multi-role RBAC** — **3 roles** (Faculty, Departmental Admin, Super Admin) with a strict approval hierarchy
+- ?? **Leave Workflow** — **4-status pipeline** (pending ? forwarded ? approved / rejected) with full audit trail
 - ?? **Certificate Requests**  Students request documents, Super Admin approves
-- ?? **AI-Powered Tools**  Request generation, quality validation, approval suggestions, and system insights via OpenRouter API (GPT-4o mini with Claude 3.5 Sonnet fallback)
-- ?? **Analytics Engine**  Summary, advanced, decision intelligence, and leave insights
-- ?? **Email Notifications**  Transactional emails via Resend for all key events
+- ?? **AI-Powered Tools** — **4 endpoints**: request generation, quality validation, approval suggestions, and system insights via OpenRouter API (GPT-4o mini with Claude 3.5 Sonnet fallback)
+- ?? **Analytics Engine** — **4 endpoints**: summary, advanced, decision intelligence, and leave insights
+- ?? **Email Notifications** — **7 transactional email templates** via Resend covering all key lifecycle events
 - ?? **File Uploads**  Supporting documents via Cloudinary (Multer middleware)
-- ?? **Audit Logs**  Complete action trail for every leave and certificate request
+- ?? **Audit Logs** — Complete action trail for every leave and certificate request across **8 Mongoose models**
 - ?? **Health Check Endpoint**  Ready for deployment monitoring
 - ?? **Global Error Handling**  Uncaught exceptions and unhandled rejections are caught at process level
 
